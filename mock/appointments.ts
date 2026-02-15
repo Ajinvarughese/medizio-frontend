@@ -1,0 +1,26 @@
+export const appointments = [
+    {
+        id: "APT-1",
+        doctorName: "Dr. Arun",
+        specialization: "Pulmonologist",
+        hospital: "Apollo Hospital",
+        location: "Chennai",
+        fee: 500,
+        date: "2026-01-18",
+        time: "10:30 AM",
+        reason: "Cough and breathing issue",
+        status: "Booked",
+    },
+    {
+        id: "APT-2",
+        doctorName: "Dr. Meera",
+        specialization: "Cardiologist",
+        hospital: "Fortis",
+        location: "Bangalore",
+        fee: 800,
+        date: "2026-01-09",
+        time: "02:00 PM",
+        reason: "Chest pain follow-up",
+        status: "Cancelled",
+    },
+];

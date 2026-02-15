@@ -1,0 +1,42 @@
+export const feedback = [
+    {
+        id: "1",
+        user: "Priya Sharma",
+        role: "Patient",
+        rating: 5,
+        message: "The appointment booking process was very smooth and easy to use. Loved the interface!",
+        date: "2026-02-01",
+    },
+    {
+        id: "2",
+        user: "Rahul Mehta",
+        role: "Patient",
+        rating: 4,
+        message: "Doctor consultation was great, but waiting time could be improved.",
+        date: "2026-02-02",
+    },
+    {
+        id: "3",
+        user: "Dr. Arjun Patel",
+        role: "Doctor",
+        rating: 5,
+        message: "The dashboard is very intuitive. Managing appointments is easy.",
+        date: "2026-02-03",
+    },
+    {
+        id: "4",
+        user: "Anjali Verma",
+        role: "Patient",
+        rating: 3,
+        message: "Had trouble uploading my lab report. Please improve file upload speed.",
+        date: "2026-02-04",
+    },
+    {
+        id: "5",
+        user: "Dr. Kavya Rao",
+        role: "Doctor",
+        rating: 4,
+        message: "Availability settings are helpful, but reminders could be smarter.",
+        date: "2026-02-05",
+    },
+];
