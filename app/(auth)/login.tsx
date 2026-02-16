@@ -8,6 +8,7 @@ import {
     Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { authUser } from "@/utils/auth";
 
 const { width } = Dimensions.get("window");
 
@@ -15,6 +16,29 @@ export default function Login() {
     const router = useRouter();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [role, setRole] = useState<"patient" | "doctor" | "admin">("patient");
+    const [showDropdown, setShowDropdown] = useState(false);
+
+    const roles: ("patient" | "doctor" | "admin")[] = [
+        "patient",
+        "doctor",
+        "admin",
+    ];
+
+    const handleLogin = () => {
+        try {
+            authUser({ loginId: email, password }, role);
+            if(role === "patient") {
+                router.push("/(tabs)/home");
+            } else if(role === "doctor") {
+                router.push("/(doctor)/(tabs)");
+            } else if(role === "admin") {
+                router.push("/(admin)");
+            }
+        } catch (error) {
+            console.log(error);
+        }
+    };
 
     return (
         <View style={styles.root}>
@@ -23,8 +47,11 @@ export default function Login() {
 
             <View style={styles.card}>
                 <Text style={styles.title}>Welcome Back 👋</Text>
-                <Text style={styles.subtitle}>Login to continue your care journey</Text>
+                <Text style={styles.subtitle}>
+                    Login to continue your care journey
+                </Text>
 
+                {/* Email */}
                 <Text style={styles.label}>Email</Text>
                 <TextInput
                     placeholder="Enter your email"
@@ -34,6 +61,7 @@ export default function Login() {
                     onChangeText={setEmail}
                 />
 
+                {/* Password */}
                 <Text style={styles.label}>Password</Text>
                 <TextInput
                     placeholder="Enter your password"
@@ -44,39 +72,60 @@ export default function Login() {
                     onChangeText={setPassword}
                 />
 
-                <TouchableOpacity onPress={() => router.push("/(auth)/forgot")}>
+                {/* Role Dropdown */}
+                <Text style={styles.label}>Login As</Text>
+
+                <TouchableOpacity
+                    style={styles.dropdown}
+                    onPress={() => setShowDropdown(!showDropdown)}
+                >
+                    <Text style={styles.dropdownText}>
+                        {role.toUpperCase()}
+                    </Text>
+                    <Text style={styles.dropdownArrow}>
+                        {showDropdown ? "▲" : "▼"}
+                    </Text>
+                </TouchableOpacity>
+
+                {showDropdown && (
+                    <View style={styles.dropdownList}>
+                        {roles.map((item) => (
+                            <TouchableOpacity
+                                key={item}
+                                style={styles.dropdownItem}
+                                onPress={() => {
+                                    setRole(item);
+                                    setShowDropdown(false);
+                                }}
+                            >
+                                <Text style={styles.dropdownItemText}>
+                                    {item.toUpperCase()}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                )}
+
+                <TouchableOpacity
+                    onPress={() => router.push("/(auth)/forgot")}
+                >
                     <Text style={styles.forgot}>Forgot Password?</Text>
                 </TouchableOpacity>
 
-                {/* Patient Login */}
+                {/* Login Button */}
                 <TouchableOpacity
                     style={styles.primaryBtn}
-                    onPress={() => router.replace("/(tabs)")}
+                    onPress={handleLogin}
                 >
-                    <Text style={styles.primaryText}>Login as Patient</Text>
-                </TouchableOpacity>
-
-                {/* Doctor Login */}
-                <TouchableOpacity
-                    style={[styles.primaryBtn, styles.doctorBtn]}
-                    onPress={() => router.replace("/(doctor)")}
-                >
-                    <Text style={[styles.primaryText, { color: "#062118" }]}>
-                        Login as Doctor
-                    </Text>
+                    <Text style={styles.primaryText}>Login</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                    style={[styles.primaryBtn, styles.doctorBtn]}
-                    onPress={() => router.replace("/(admin)")}
+                    onPress={() => router.push("/(auth)/register")}
                 >
-                    <Text style={[styles.primaryText, { color: "#062118" }]}>
-                        Login as Admin
+                    <Text style={styles.link}>
+                        Don’t have an account? Register
                     </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity onPress={() => router.push("/(auth)/register")}>
-                    <Text style={styles.link}>Don’t have an account? Register</Text>
                 </TouchableOpacity>
             </View>
         </View>
@@ -123,6 +172,7 @@ const styles = StyleSheet.create({
     },
 
     title: { fontSize: 26, fontWeight: "900", color: "#102A43" },
+
     subtitle: {
         marginTop: 6,
         marginBottom: 18,
@@ -130,7 +180,12 @@ const styles = StyleSheet.create({
         fontWeight: "600",
     },
 
-    label: { fontWeight: "800", color: "#102A43", marginTop: 10 },
+    label: {
+        fontWeight: "800",
+        color: "#102A43",
+        marginTop: 10,
+    },
+
     input: {
         marginTop: 6,
         backgroundColor: "rgba(255,255,255,0.9)",
@@ -138,6 +193,49 @@ const styles = StyleSheet.create({
         padding: 14,
         borderWidth: 1,
         borderColor: "rgba(16,42,67,0.08)",
+        color: "#102A43",
+    },
+
+    /* Dropdown Styles */
+    dropdown: {
+        marginTop: 6,
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        backgroundColor: "rgba(255,255,255,0.9)",
+        borderRadius: 14,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: "rgba(16,42,67,0.08)",
+    },
+
+    dropdownText: {
+        color: "#102A43",
+        fontWeight: "700",
+    },
+
+    dropdownArrow: {
+        fontSize: 14,
+        color: "#102A43",
+    },
+
+    dropdownList: {
+        marginTop: 4,
+        backgroundColor: "#fff",
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: "rgba(16,42,67,0.08)",
+        overflow: "hidden",
+    },
+
+    dropdownItem: {
+        padding: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: "rgba(16,42,67,0.05)",
+    },
+
+    dropdownItemText: {
+        fontWeight: "600",
         color: "#102A43",
     },
 
@@ -156,12 +254,10 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
 
-    doctorBtn: {
-        backgroundColor: "#37d06d",
-        marginTop: 10,
+    primaryText: {
+        color: "#fff",
+        fontWeight: "900",
     },
-
-    primaryText: { color: "#fff", fontWeight: "900" },
 
     link: {
         marginTop: 16,

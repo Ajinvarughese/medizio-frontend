@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
     View,
     Text,
@@ -13,12 +13,18 @@ import {
 import { useRouter } from "expo-router";
 import { icons } from "@/constants/icons";
 import AIChat from "@/components/AIChat";
+import { identifyUser } from "@/utils/auth";
 
 const { width, height } = Dimensions.get("window");
 
 export default function Index() {
     const router = useRouter();
     const [openAI, setOpenAI] = useState(false);
+
+    useEffect(() => {
+        identifyUser();
+    }, []);
+
 
     return (
         <View style={{ flex: 1 }}>

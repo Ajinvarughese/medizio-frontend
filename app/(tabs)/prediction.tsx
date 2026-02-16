@@ -18,22 +18,22 @@ import { mockPredictions } from "@/mock/prediction";
 
 const { width } = Dimensions.get("window");
 
-type DiseaseKey = "pneumonia" | "tb" | "brainTumor" | "normal";
+type DiseaseKey = "diabetes" | "heart" | "parkinson" | "normal";
 
 export default function PredictDisease() {
     const router = useRouter();
 
-    const [selectedDisease, setSelectedDisease] = useState<DiseaseKey>("pneumonia");
+    const [selectedDisease, setSelectedDisease] = useState<DiseaseKey>("diabetes");
     const [file, setFile] = useState<any>(null);
     const [predicting, setPredicting] = useState(false);
     const [result, setResult] = useState<any>(null);
 
     const diseaseOptions = useMemo(
         () => [
-            { key: "pneumonia", title: "Pneumonia", desc: "Chest X-ray AI detection" },
-            { key: "tb", title: "Tuberculosis", desc: "Lung infection screening" },
-            { key: "brainTumor", title: "Brain Tumor", desc: "MRI/CT scan analysis" },
-            { key: "normal", title: "General Check", desc: "Basic AI screening" },
+            { key: "diabetes", title: "Diabetes", desc: "Blood sugar level analysis" },
+            { key: "heart", title: "Heart Disease", desc: "ECG analysis" },
+            { key: "parkinson", title: "Parkinson's", desc: "Speech analysis" },
+            { key: "normal", title: "General Check", desc: "Tell AI your symptoms" },
         ],
         []
     );

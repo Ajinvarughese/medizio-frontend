@@ -9,6 +9,7 @@ import {
     Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { logout } from "@/utils/auth";
 
 const { width } = Dimensions.get("window");
 
@@ -26,12 +27,10 @@ export default function Settings() {
         );
     };
 
-    const logout = () => {
-        Alert.alert("Logout", "Do you want to logout?", [
-            { text: "Cancel", style: "cancel" },
-            { text: "Logout", onPress: () => router.replace("/") },
-        ]);
-    };
+    const handleLogout = () => {
+        logout();
+        router.replace('/(auth)/welcome');
+    }
 
     return (
         <ScrollView style={styles.root} contentContainerStyle={{ paddingBottom: 100 }}>
@@ -53,7 +52,7 @@ export default function Settings() {
 
             <View style={styles.card}>
                 <SettingItem icon="🗑️" label="Delete Account" danger onPress={confirmDelete} />
-                <SettingItem icon="🚪" label="Logout" danger onPress={logout} />
+                <SettingItem icon="🚪" label="Logout" danger onPress={handleLogout} />
             </View>
         </ScrollView>
     );

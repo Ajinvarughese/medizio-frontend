@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
     View,
     Text,
@@ -10,11 +10,16 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { icons } from "@/constants/icons";
+import { identifyUser } from "@/utils/auth";
 
 const { width } = Dimensions.get("window");
 
 export default function Index() {
     const router = useRouter();
+
+    useEffect(() => {
+        identifyUser();
+    }, []);
 
     return (
         <ScrollView style={styles.root} showsVerticalScrollIndicator={false}>
