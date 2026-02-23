@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
     View,
     Text,
@@ -12,16 +12,30 @@ import {
     Animated,
     Easing,
 } from "react-native";
-import { icons } from "@/constants/icons";
+import { icons } from "@/interfaces/constants/icons";
 import { useRouter } from "expo-router";
 
-import { user } from "@/mock/user";
 import { appointments } from "@/mock/appointments";
+import { getUser } from "@/utils/auth";
+import { Patient } from "@/types/entity";
 
 const { width } = Dimensions.get("window");
 
 export default function Dashboard() {
     const router = useRouter();
+
+    const [user, setUser] = useState<Patient | null>(null);
+
+    useEffect(() => {
+        const loadPatient = async () => {
+            const data = await getUser();
+            setUser(data);
+            console.log(data);
+        };
+
+        loadPatient();
+    }, []);
+
 
     const [openMenu, setOpenMenu] = useState(false);
     const slideAnim = useRef(new Animated.Value(-width)).current;
@@ -83,8 +97,8 @@ export default function Dashboard() {
 
                         <View style={{ flex: 1 }}>
                             <Text style={styles.hello}>Welcome Back 👋</Text>
-                            <Text style={styles.name}>{user.name}</Text>
-                            <Text style={styles.sub}>{user.role} • ID: {user.id}</Text>
+                            <Text style={styles.name}>{user?.name}</Text>
+                            <Text style={styles.sub}>PATIENT • ID: NIV-ZYO-{user?.id}</Text>
                         </View>
 
                         <TouchableOpacity style={styles.menuBtn} onPress={openDrawer}>
@@ -134,10 +148,9 @@ export default function Dashboard() {
                 <SectionHeader title="User Details" sub="Patient information" />
 
                 <View style={styles.glassCard}>
-                    <DetailRow label="Name" value={user.name} />
-                    <DetailRow label="Phone" value={user.phone} />
-                    <DetailRow label="Email" value={user.email} />
-                    <DetailRow label="Location" value={user.location} />
+                    <DetailRow label="Name" value={user?.name} />
+                    <DetailRow label="Email" value={user?.email} />
+                    <DetailRow label="Location" value={user?.location} />
                 </View>
             </ScrollView>
 
@@ -149,7 +162,7 @@ export default function Dashboard() {
                     </Animated.View>
 
                     <Animated.View style={[styles.drawer, { transform: [{ translateX: slideAnim }] }]}>
-                        <Text style={styles.patientName}>Hello, {user.name} 👋</Text>
+                        <Text style={styles.patientName}>Hello, {user?.name} 👋</Text>
 
                         {drawerItem("🏠", "Home", () => { closeDrawer(); router.push("/"); })}
                         {drawerItem("📅", "Appointments", () => { closeDrawer(); router.push("/(tabs)/appointments"); })}

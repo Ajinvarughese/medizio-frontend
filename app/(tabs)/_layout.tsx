@@ -1,6 +1,6 @@
 import { Tabs } from "expo-router";
 import { Image, Text, View, StyleSheet } from "react-native";
-import { icons } from "@/constants/icons";
+import { icons } from "@/interfaces/constants/icons";
 
 const ACTIVE = "#37d06d"; // mint
 const INACTIVE = "rgba(16,42,67,0.45)";

@@ -13,9 +13,11 @@ export interface Doctor {
 }
 
 export interface Patient {
-  name?: string;
-  email: string;
-  dob?: string;
-  createdAt: string;
-  updatedAt: string;
+    id: number;
+    name?: string;
+    email: string;
+    dob?: string;
+    location?: string;
+    createdAt: string;
+    updatedAt: string;
 }

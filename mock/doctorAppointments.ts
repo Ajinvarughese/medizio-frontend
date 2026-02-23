@@ -1,3 +1,13 @@
+import API_URL from "@/utils/api";
+import { getUser } from "@/utils/auth";
+import axios from "axios";
+
+export const fetchDoctorAppointments = async () => {
+    const doctor = await getUser();
+    const res = await axios.get(`${API_URL}/appointment/doctor/${doctor?.id}`);  
+    return res.data;  
+}
+
 export const doctorAppointments = [
     {
         id: "D1",

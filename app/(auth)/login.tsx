@@ -6,6 +6,7 @@ import {
     TextInput,
     TouchableOpacity,
     Dimensions,
+    Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { authUser } from "@/utils/auth";
@@ -25,9 +26,10 @@ export default function Login() {
         "admin",
     ];
 
-    const handleLogin = () => {
+    const handleLogin = async () => {
         try {
-            authUser({ loginId: email, password }, role);
+            await authUser({ loginId: email, password }, role);
+
             if(role === "patient") {
                 router.push("/(tabs)/home");
             } else if(role === "doctor") {
@@ -36,6 +38,7 @@ export default function Login() {
                 router.push("/(admin)");
             }
         } catch (error) {
+            Alert.alert("Login Failed", "Please check your credentials.");
             console.log(error);
         }
     };

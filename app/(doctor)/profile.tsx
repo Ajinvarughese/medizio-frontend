@@ -1,10 +1,24 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
-import { doctor } from "@/mock/doctor";
+
+import { getUser, logout } from "@/utils/auth";
+import { Image } from "react-native";
+import { getAllPatients } from "@/utils/patients";
 
 export default function DoctorSidebar() {
     const router = useRouter();
+
+    const [doctor, setDoctor] = useState({});
+    const [patients, setPatients] = useState([]);
+
+    useEffect(() => {
+        const fetchDetails = async () => {
+            setDoctor(await getUser());
+            setPatients(await getAllPatients());
+        }
+        fetchDetails();
+    }, []);
 
     return (
         <ScrollView
@@ -15,7 +29,7 @@ export default function DoctorSidebar() {
             {/* PROFILE HEADER */}
             <View style={styles.headerCard}>
                 <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>{doctor.name.charAt(0)}</Text>
+                    <Image source={doctor?.picture} resizeMode="cover" style={styles.avatar} />
                 </View>
 
                 <View style={{ flex: 1 }}>
@@ -31,7 +45,7 @@ export default function DoctorSidebar() {
 
             {/* QUICK STATS */}
             <View style={styles.statsRow}>
-                <Stat label="Patients" value="128" />
+                <Stat label="Patients" value={patients?.length} />
                 <Stat label="Rating" value="4.9 ⭐" />
                 <Stat label="Reports" value="12" />
             </View>
@@ -51,7 +65,10 @@ export default function DoctorSidebar() {
             {/* LOGOUT */}
             <TouchableOpacity
                 style={styles.logoutBtn}
-                onPress={() => router.push("/(auth)/welcome")}   // back to main index
+                onPress={() => {
+                    logout();
+                    router.push("/(auth)/welcome")
+                }}   // back to main index
             >
                 <Text style={styles.logoutText}>🚪 Logout</Text>
             </TouchableOpacity>
@@ -106,7 +123,6 @@ const styles = StyleSheet.create({
         width: 64,
         height: 64,
         borderRadius: 20,
-        backgroundColor: "#37d06d",
         justifyContent: "center",
         alignItems: "center",
         marginRight: 14,

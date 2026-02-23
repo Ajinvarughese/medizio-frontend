@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -11,9 +11,12 @@ import {
   ActivityIndicator,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { saveUser } from "@/utils/auth";
-import { AxiosError } from "axios";
+import { saveUser, uploadImage } from "@/utils/auth";
+import axios, { AxiosError } from "axios";
 import { useRouter } from "expo-router";
+import API_URL from "@/utils/api";
+import { Picker } from "@react-native-picker/picker";
+import { getDoctorSpeciality } from "@/utils/doctor";
 
 type Role = "patient" | "doctor" | "admin";
 
@@ -21,17 +24,33 @@ export default function Register() {
     const router = useRouter();
   const [role, setRole] = useState<Role>("patient");
   const [loading, setLoading] = useState(false);
-  const [photo, setPhoto] = useState<string | null>(null);
+  const [photo, setPhoto] = useState<any>(null);
 
   // Common fields
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-
+  const [location, setLocation] = useState("");
+  const [dob, setDob] = useState("");
   // Doctor specific
-  const [specialization, setSpecialization] = useState("");
+  const [specialities, setSpecialities] = useState<any[]>([]);
+  const [specialityId, setSpecialityId] = useState<number | null>(null);
+
   const [experience, setExperience] = useState("");
+
+  useEffect(() => {
+    const fetchSpecialities = async () => {
+      try {
+        const data = await getDoctorSpeciality();
+        setSpecialities(data);
+      } catch (error) {
+        Alert.alert("Error", "Failed to load specialities");
+      }
+    };
+
+    fetchSpecialities();
+  }, []);
 
   const pickImage = async () => {
     const res = await ImagePicker.launchImageLibraryAsync({
@@ -40,9 +59,10 @@ export default function Register() {
     });
 
     if (!res.canceled) {
-      setPhoto(res.assets[0].uri);
+      setPhoto(res.assets[0]); // ✅ store full object
     }
   };
+
 
   const handleRegister = async () => {
     if (!email || !password) {
@@ -53,31 +73,51 @@ export default function Register() {
       return Alert.alert("Error", "Passwords do not match.");
     }
 
+    if (password.length < 6) {
+      return Alert.alert("Error", "Password must be at least 6 characters long.");
+    }
+
     try {
       setLoading(true);
-
+      // 🔥 STEP 2: Send register payload
       let payload: any = {
         email,
         password,
+        dob,
+        location,
       };
 
       if (role === "patient") {
-        payload.name = name;
+        payload = {
+          ...payload,
+          name,
+        };
       }
+      
 
       if (role === "doctor") {
-        payload.specialization = specialization;
-        payload.experience = Number(experience);
-        payload.picture = photo;
-      }
+        const uploadedImageUrl = await uploadImage(photo);
+        if (!specialityId) {
+          return Alert.alert("Error", "Please select a speciality.");
+        }
+
+        payload = {
+          ...payload,
+          name,
+          experience: Number(experience),
+          picture: uploadedImageUrl,
+          specialityId
+        }
+      } 
+      
 
       await saveUser(payload, role);
 
       Alert.alert("Success", `${role} registered successfully!`);
-      
-      if(role === "patient") router.push("/(tabs)");
+
+      if (role === "patient") router.push("/(tabs)/home");
       else if (role === "doctor") router.push("/(doctor)/(tabs)");
-      else if (role === "admin") router.push("/(admin)");
+      else router.push("/(admin)");
     } catch (error) {
       const err = error as AxiosError;
       Alert.alert("Error", err.response?.data as string || err.message);
@@ -86,6 +126,8 @@ export default function Register() {
     }
   };
 
+
+
   return (
     <ScrollView style={styles.root} contentContainerStyle={{ padding: 22 }}>
       <View style={styles.card}>
@@ -93,7 +135,7 @@ export default function Register() {
 
         {/* ROLE SELECTOR */}
         <View style={styles.roleRow}>
-          {["Patient", "Doctor", "Admin"].map((r) => (
+          {["patient", "doctor", "admin"].map((r) => (
             <TouchableOpacity
               key={r}
               style={[styles.roleBtn, role === r && styles.roleActive]}
@@ -105,7 +147,7 @@ export default function Register() {
                   role === r && { color: "#fff" },
                 ]}
               >
-                {r}
+                {r.toUpperCase()}
               </Text>
             </TouchableOpacity>
           ))}
@@ -123,29 +165,54 @@ export default function Register() {
           value={confirmPassword}
           onChange={setConfirmPassword}
         />
-
+        <Input
+            label="Date of birth"
+            value={dob}
+            onChange={setDob}
+          />
+        <Input
+            label="Location"
+            value={location}
+            onChange={setLocation}
+          />
+        
         {role === "doctor" && (
           <>
-            <Input
-              label="Specialization"
-              value={specialization}
-              onChange={setSpecialization}
-            />
+           <Text style={styles.label}>Specialization</Text>
+
+            <View style={styles.dropdownWrapper}>
+              <Picker
+                selectedValue={specialityId}
+                onValueChange={(itemValue) => setSpecialityId(itemValue)}
+                style={styles.picker}
+                dropdownIconColor="#102A43"
+              >
+                <Picker.Item label="Select Speciality" value={null} />
+                {specialities.map((s) => (
+                  <Picker.Item key={s.id} label={s.name} value={s.id} />
+                ))}
+              </Picker>
+            </View>
             <Input
               label="Experience (Years)"
               keyboard="numeric"
               value={experience}
               onChange={setExperience}
             />
-
+            
             <Text style={styles.label}>Profile Photo</Text>
             <TouchableOpacity style={styles.photoBox} onPress={pickImage}>
               {photo ? (
-                <Image source={{ uri: photo }} style={styles.photo} />
+                <Image
+                  source={{ uri: photo.uri }}
+                  style={styles.photo}
+                  resizeMode="cover"
+                />
               ) : (
-                <Text style={{ color: "#102A43" }}>Tap to Upload</Text>
+                <Text style={styles.photoPlaceholder}>Tap to Upload</Text>
               )}
             </TouchableOpacity>
+
           </>
         )}
 
@@ -156,6 +223,14 @@ export default function Register() {
             <Text style={styles.primaryText}>Register</Text>
           )}
         </TouchableOpacity>
+
+        <TouchableOpacity
+              onPress={() => router.push("/(auth)/login")}
+          >
+              <Text style={styles.link}>
+                  Already have an account? Login
+              </Text>
+          </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -205,6 +280,26 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
 
+  photoBox: {
+    height: 160,
+    borderRadius: 20,
+    backgroundColor: "rgba(16,42,67,0.06)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 8,
+    overflow: "hidden",   // 🔥 VERY IMPORTANT
+  },
+
+  photo: {
+    width: "100%",
+    height: "100%",
+  },
+
+  photoPlaceholder: {
+    color: "#102A43",
+    fontWeight: "600",
+  },
+
   title: {
     fontSize: 26,
     fontWeight: "900",
@@ -225,6 +320,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginHorizontal: 4,
   },
+
+  link: {
+        marginTop: 16,
+        textAlign: "center",
+        color: "#102A43",
+        fontWeight: "700",
+    },
 
   roleActive: {
     backgroundColor: "#37d06d",
@@ -250,21 +352,6 @@ const styles = StyleSheet.create({
     borderColor: "rgba(16,42,67,0.08)",
   },
 
-  photoBox: {
-    height: 110,
-    borderRadius: 16,
-    backgroundColor: "rgba(16,42,67,0.06)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 8,
-  },
-
-  photo: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 16,
-  },
-
   primaryBtn: {
     marginTop: 22,
     backgroundColor: "#102A43",
@@ -276,5 +363,19 @@ const styles = StyleSheet.create({
   primaryText: {
     color: "#fff",
     fontWeight: "900",
+  },
+  dropdownWrapper: {
+    marginTop: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(16,42,67,0.08)",
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    height: 54,
+    paddingHorizontal: 6,
+  },
+
+  picker: {
+    color: "#102A43",
   },
 });

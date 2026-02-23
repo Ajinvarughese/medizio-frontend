@@ -9,7 +9,7 @@ import {
     Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { icons } from "@/constants/icons";
+import { icons } from "@/interfaces/constants/icons";
 import { identifyUser } from "@/utils/auth";
 
 const { width } = Dimensions.get("window");

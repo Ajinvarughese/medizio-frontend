@@ -1,10 +1,20 @@
-import React, { useState } from "react";
+import { getUser } from "@/utils/auth";
+import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from "react-native";
-import { doctor as mockDoctor } from "@/mock/doctor";
+
 
 export default function EditDoctorProfile() {
-    const [name, setName] = useState(mockDoctor.name);
-    const [specialization, setSpecialization] = useState(mockDoctor.specialization);
+    const [mockDoctor, setDoctor] = useState({});
+
+    useEffect(() => {
+        const fetchDoctor = async () => {
+            setDoctor(await getUser());
+        }
+        fetchDoctor();
+    }, []);
+
+    const [name, setName] = useState(mockDoctor.name || "");
+    const [specialization, setSpecialization] = useState(mockDoctor.specialization || "");
     const [phone, setPhone] = useState(mockDoctor.phone || "");
     const [email, setEmail] = useState(mockDoctor.email || "");
 

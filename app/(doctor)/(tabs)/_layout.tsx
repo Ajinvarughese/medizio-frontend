@@ -1,6 +1,6 @@
 import { Tabs } from "expo-router";
 import { Image, Text, View, StyleSheet } from "react-native";
-import { icons } from "@/constants/icons";
+import { icons } from "@/interfaces/constants/icons";
 
 const ACTIVE = "#37d06d";
 const INACTIVE = "rgba(16,42,67,0.45)";
@@ -70,15 +70,6 @@ export default function DoctorTabsLayout() {
                 options={{
                     tabBarIcon: ({ focused }) => (
                         <TabIcon focused={focused} icon={icons.calendar || icons.doctorr} label="reports" />
-                    ),
-                }}
-            />
-
-            <Tabs.Screen
-                name="notifications"
-                options={{
-                    tabBarIcon: ({ focused }) => (
-                        <TabIcon focused={focused} icon={icons.user} label="notifications" />
                     ),
                 }}
             />

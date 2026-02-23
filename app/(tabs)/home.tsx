@@ -11,7 +11,7 @@ import {
     Pressable,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { icons } from "@/constants/icons";
+import { icons } from "@/interfaces/constants/icons";
 import AIChat from "@/components/AIChat";
 import { identifyUser } from "@/utils/auth";
 

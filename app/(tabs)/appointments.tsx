@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
     View,
     Text,
@@ -14,41 +14,72 @@ import {
     UIManager,
 } from "react-native";
 
-import { doctors } from "@/mock/doctors";
-import { icons } from "@/constants/icons";
-import { images } from "@/constants/images";
-
-import { saveAppointment } from "@/utils/appointments";
+import { icons } from "@/interfaces/constants/icons";
+import { images } from "@/interfaces/constants/images";
+import { isAvailable, saveAppointment } from "@/utils/appointments";
+import { fetchAllDoctors } from "@/utils/doctor";
+import { isValidFutureDate } from "@/utils/dateTime";
+import { getUser } from "@/utils/auth";
+import axios from "axios";
 
 const { width } = Dimensions.get("window");
 
-/* Enable animation on Android */
 if (Platform.OS === "android") {
     UIManager.setLayoutAnimationEnabledExperimental?.(true);
 }
 
 export default function AppointmentBooking() {
     const [search, setSearch] = useState("");
-    const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [expandedId, setExpandedId] = useState<number | null>(null);
+    const [doctors, setDoctors] = useState<any[]>([]);
 
-    // booking fields
-    const [selectedSlot, setSelectedSlot] = useState<string>("");
-    const [selectedDate, setSelectedDate] = useState<string>("");
-    const [reason, setReason] = useState<string>("");
+    const [selectedDate, setSelectedDate] = useState("");
+    const [selectedTime, setSelectedTime] = useState("");
+    const [availability, setAvailability] = useState<boolean | null>(null);
+    
+    const [reason, setReason] = useState("");
+
+    useEffect(() => {
+        const loadData = async () => {
+            const data = await fetchAllDoctors();
+
+            // Sort: true first, false last
+            const sorted = data.sort((a: any, b: any) => {
+                return Number(b.availability) - Number(a.availability);
+            });
+
+            setDoctors(sorted);
+        };
+
+        loadData();
+    }, []);
+
+    const checkAvailability = async () => {
+
+        if (!selectedDate || !selectedTime || !expandedId || !isValidFutureDate(selectedDate)) return;
+        
+        const res = await isAvailable(expandedId, selectedDate, selectedTime);
+        setAvailability(res);
+        return res;
+    }
+
+    useEffect(() => {
+        checkAvailability();
+    },[expandedId, selectedDate, selectedTime]);
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
         if (!q) return doctors;
 
         return doctors.filter(
-            (d) =>
-                d.name.toLowerCase().includes(q) ||
-                d.specialization.toLowerCase().includes(q) ||
-                d.location.toLowerCase().includes(q)
+            (d: any) =>
+                d?.name?.toLowerCase().includes(q) ||
+                d?.speciality?.name?.toLowerCase().includes(q) ||
+                d?.location?.toLowerCase().includes(q)
         );
-    }, [search]);
+    }, [search, doctors]);
 
-    const toggleExpand = (id: string) => {
+    const toggleExpand = (id: number) => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 
         if (expandedId === id) {
@@ -57,66 +88,103 @@ export default function AppointmentBooking() {
         }
 
         setExpandedId(id);
-        setSelectedSlot("");
         setSelectedDate("");
         setReason("");
     };
 
     const handleBook = async (doc: any) => {
-        if (!doc.available) {
-            Alert.alert("Not Available", "This doctor is not available right now.");
+        if (!selectedDate || !reason || !selectedTime) {
+            Alert.alert("Missing Info", "Please enter Date and Reason.");
             return;
         }
 
-        if (!selectedDate || !selectedSlot || !reason) {
-            Alert.alert("Missing Info", "Please enter Date, Slot, and Reason.");
-            return;
-        }
+        if(!checkAvailability()) return;
 
-        await saveAppointment({
-            doctorId: doc.id,
-            doctorName: doc.name,
-            specialization: doc.specialization,
-            hospital: doc.hospital,
-            location: doc.location,
-            fee: doc.fee,
+        const patientId = await getUser();
+        const payload = {
             date: selectedDate,
-            time: selectedSlot,
+            time: selectedTime,
             reason,
-            status: "Booked",
-        });
+            doctor: {
+                id: doc.id
+            },
+            patient: {
+                id: patientId.id
+            }
+        }  
+        try {
+            await saveAppointment(payload);
+        } catch (error) {
+            if(axios.isAxiosError(error)) {
+                if(error.response?.status === 409) {
+                    Alert.alert("Appointment Conflict", "Appointment already exists for this time.");
+                }
+            }
+        }
 
-        Alert.alert("Appointment Booked ✅", `Booked with ${doc.name} at ${selectedSlot}`);
+        Alert.alert("Appointment Booked ✅", `Booked with ${doc.name}`);
         setExpandedId(null);
-        setSelectedSlot("");
         setSelectedDate("");
         setReason("");
+        setAvailability(null);
+    };
+
+    const generateTimeSlots = (start: string, end: string) => {
+        const parseTime = (time: string) => {
+            const [clock, modifier] = time.split(" ");
+            let [hours, minutes] = clock.split(":").map(Number);
+
+            if (modifier === "PM" && hours !== 12) hours += 12;
+            if (modifier === "AM" && hours === 12) hours = 0;
+
+            return hours * 60 + minutes;
+        };
+
+        const formatTime = (minutes: number) => {
+            let hrs = Math.floor(minutes / 60);
+            const mins = minutes % 60;
+            const modifier = hrs >= 12 ? "PM" : "AM";
+
+            if (hrs > 12) hrs -= 12;
+            if (hrs === 0) hrs = 12;
+
+            return `${hrs}:${mins.toString().padStart(2, "0")} ${modifier}`;
+        };
+
+        const startMin = parseTime(start);
+        const endMin = parseTime(end);
+
+        const slots: string[] = [];
+
+        for (let t = startMin; t <= endMin; t += 10) {
+            slots.push(formatTime(t));
+        }
+
+        return slots;
     };
 
     return (
-        <ScrollView style={styles.root} contentContainerStyle={{ paddingBottom: 160 }}>
-            {/* bg */}
+        <ScrollView style={styles.root} contentContainerStyle={{ paddingBottom: 120 }}>
             <Image source={images.bg} style={styles.bg} />
             <View style={styles.bgBlob1} />
             <View style={styles.bgBlob2} />
 
-            {/* HEADER */}
+            {/* Header */}
             <View style={styles.header}>
                 <View style={styles.headerRow}>
                     <View style={styles.logoWrap}>
                         <Image source={icons.logo} style={styles.logo} />
                     </View>
-
                     <View style={{ flex: 1 }}>
                         <Text style={styles.title}>Book Appointment</Text>
                         <Text style={styles.subTitle}>
-                            Search doctors and schedule appointment instantly
+                            Search doctors and schedule appointment
                         </Text>
                     </View>
                 </View>
             </View>
 
-            {/* SEARCH */}
+            {/* Search */}
             <View style={styles.searchBox}>
                 <Text style={styles.searchIcon}>🔍</Text>
                 <TextInput
@@ -128,142 +196,159 @@ export default function AppointmentBooking() {
                 />
             </View>
 
-            {/* LIST */}
+            {/* Doctor List */}
             <View style={{ marginTop: 16 }}>
-                {filtered.map((doc) => {
+                {filtered.map((doc: any) => {
                     const isOpen = expandedId === doc.id;
 
-                    const badge = doc.available
-                        ? { bg: "rgba(22,163,74,0.14)", text: "#16a34a", label: "Available" }
-                        : { bg: "rgba(239,68,68,0.14)", text: "#ef4444", label: "Unavailable" };
-
                     return (
-                        <View key={doc.id} style={styles.card}>
-                            {/* Main Card */}
-                            <TouchableOpacity activeOpacity={0.9} onPress={() => toggleExpand(doc.id)}>
+                        <View key={doc.id} style={{
+                            ...styles.card,
+                            opacity: doc?.availability ? 1 : 0.7
+                        }}>
+                            <TouchableOpacity
+                                disabled={!doc?.availability}
+                                activeOpacity={0.9}
+                                onPress={() => toggleExpand(doc.id)}
+                            >
                                 <View style={styles.topRow}>
                                     <View style={styles.leftRow}>
                                         <View style={styles.avatarWrap}>
-                                            <Image source={icons.doctor} style={styles.avatar} />
+                                            <Image
+                                                source={{ uri: doc.picture }}
+                                                style={styles.avatar}
+                                            />
                                         </View>
 
                                         <View style={{ flex: 1 }}>
                                             <Text style={styles.docName}>{doc.name}</Text>
 
-                                            <View style={styles.subRow}>
-                                                <View style={styles.specChip}>
-                                                    <Text style={styles.specChipText}>{doc.specialization}</Text>
-                                                </View>
-
-                                                <View style={[styles.badge, { backgroundColor: badge.bg }]}>
-                                                    <Text style={[styles.badgeText, { color: badge.text }]}>
-                                                        {badge.label}
-                                                    </Text>
-                                                </View>
+                                            <View style={styles.specChip}>
+                                                <Text style={styles.specChipText}>
+                                                    {doc.speciality?.name}
+                                                </Text>
                                             </View>
                                         </View>
                                     </View>
 
-                                    <Text style={styles.expandText}>{isOpen ? "Hide ▲" : "Book ▼"}</Text>
+                                    <Text style={styles.expandText}>
+                                        {isOpen ? "Hide ▲" : "Book ▼"}
+                                    </Text>
                                 </View>
 
-                                <View style={styles.metaRow}>
-                                    <Text style={styles.metaItem}>⭐ {doc.rating}</Text>
-                                    <Text style={styles.metaDot}>•</Text>
-                                    <Text style={styles.metaItem}>🧑‍⚕️ {doc.experience} yrs</Text>
-                                    <Text style={styles.metaDot}>•</Text>
-                                    <Text style={styles.metaItem}>₹ {doc.fee}</Text>
-                                </View>
-
-                                <Text style={styles.smallLine}>
-                                    🏥 {doc.hospital}   •   📍 {doc.location}
+                                <Text style={styles.metaLine}>
+                                    🧑‍⚕️ {doc.experience} yrs experience
                                 </Text>
 
-                                <Text style={styles.visitLine}>
-                                    ⏰ {doc.visitingTime} ({doc.days})
+                                <Text style={styles.metaLine}>
+                                    📍 {doc.location}
+                                </Text>
+
+                                <Text style={styles.metaLine}>
+                                    ⏰ {doc.startTime} - {doc.endTime}
                                 </Text>
                             </TouchableOpacity>
+                                {
+                                    !doc?.availability &&
+                                        <Text style={{color: "red", fontWeight: 700, marginTop: 10}}> Doctor unavailable </Text>
+                                }     
+                        
+                        
+                        {isOpen && (
+                            <View style={styles.detailBox}>
+                                <Text style={styles.label}>Date</Text>
+                                <TextInput
+                                    value={selectedDate}
+                                    onChangeText={setSelectedDate}
+                                    placeholder="YYYY-MM-DD"
+                                    style={styles.input}
+                                />
+                                {selectedDate.length > 0 && (
+                                        !isValidFutureDate(selectedDate) ? (
+                                        <Text style={{color: "red", marginLeft: 5}}>Please enter a valid date</Text>
+                                        ) : ""
+                                )}
 
-                            {/* Expand Booking Form */}
-                            {isOpen && (
-                                <View style={styles.detailBox}>
-                                    <Text style={styles.formTitle}>Appointment Details</Text>
+                                <Text style={styles.label}>Select Time</Text>
 
-                                    <Text style={styles.label}>Date</Text>
-                                    <TextInput
-                                        value={selectedDate}
-                                        onChangeText={setSelectedDate}
-                                        placeholder="YYYY-MM-DD"
-                                        placeholderTextColor="rgba(16,42,67,0.45)"
-                                        style={styles.input}
-                                    />
+                                <ScrollView
+                                    style={styles.slotContainer}
+                                    contentContainerStyle={styles.slotWrap}
+                                    showsVerticalScrollIndicator={false}
+                                >
+                                    {generateTimeSlots(doc.startTime, doc.endTime).map((time) => {
+                                        const active = selectedTime === time;
 
-                                    <Text style={styles.label}>Select Time Slot</Text>
-
-                                    <View style={styles.slotWrap}>
-                                        {doc.slots.map((slot: string) => {
-                                            const active = selectedSlot === slot;
-
-                                            return (
-                                                <TouchableOpacity
-                                                    key={slot}
-                                                    style={[styles.slotBtn, active && styles.slotBtnActive]}
-                                                    onPress={() => setSelectedSlot(slot)}
-                                                    activeOpacity={0.9}
+                                        return (
+                                            <TouchableOpacity
+                                                key={time}
+                                                style={[
+                                                    styles.slotBtn,
+                                                    active && styles.slotBtnActive,
+                                                ]}
+                                                onPress={() => setSelectedTime(time)}
+                                            >
+                                                <Text
+                                                    style={[
+                                                        styles.slotText,
+                                                        active && styles.slotTextActive,
+                                                    ]}
                                                 >
-                                                    <Text style={[styles.slotText, active && styles.slotTextActive]}>
-                                                        {slot}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            );
-                                        })}
-                                    </View>
+                                                    {time}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </ScrollView>
 
-                                    <Text style={styles.label}>Reason</Text>
-                                    <TextInput
-                                        value={reason}
-                                        onChangeText={setReason}
-                                        placeholder="Explain symptoms or purpose"
-                                        placeholderTextColor="rgba(16,42,67,0.45)"
-                                        style={[styles.input, { height: 90 }]}
-                                        multiline
-                                    />
-
-                                    <TouchableOpacity
-                                        style={[styles.bookBtn, !doc.available && { opacity: 0.5 }]}
-                                        onPress={() => handleBook(doc)}
-                                        disabled={!doc.available}
-                                        activeOpacity={0.9}
-                                    >
-                                        <Text style={styles.bookText}>Confirm Appointment</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            )}
+                                <Text style={styles.label}>Reason</Text>
+                                <TextInput
+                                    value={reason}
+                                    onChangeText={setReason}
+                                    placeholder="Explain symptoms"
+                                    style={[styles.input, { height: 90 }]}
+                                    multiline
+                                />
+                                <Text
+                                    style={[
+                                        styles.label,
+                                        availability === true && { color: "green" },
+                                        availability === false && { color: "red" },
+                                    ]}
+                                >
+                                    {availability === null
+                                        ? ""
+                                        : availability
+                                        ? "Doctor is available"
+                                        : "Doctor is unavailable"}
+                                </Text>
+                                <TouchableOpacity
+                                    style={styles.bookBtn}
+                                    onPress={() => handleBook(doc)}
+                                >
+                                    <Text style={styles.bookText}>
+                                        Confirm Appointment
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+                        
                         </View>
                     );
                 })}
 
                 {filtered.length === 0 && (
-                    <View style={{ paddingHorizontal: 20, marginTop: 24 }}>
-                        <Text style={styles.empty}>No doctors found.</Text>
-                    </View>
+                    <Text style={styles.empty}>No doctors found.</Text>
                 )}
             </View>
         </ScrollView>
     );
 }
 
-/* ---------------- Styles ---------------- */
-
 const styles = StyleSheet.create({
     root: { flex: 1, backgroundColor: "#F5FBFF", paddingTop: 50 },
 
-    bg: {
-        position: "absolute",
-        width: "100%",
-        height: "100%",
-        opacity: 0.06,
-    },
+    bg: { position: "absolute", width: "100%", height: "100%", opacity: 0.05 },
 
     bgBlob1: {
         position: "absolute",
@@ -294,67 +379,34 @@ const styles = StyleSheet.create({
         backgroundColor: "rgba(16,42,67,0.08)",
         justifyContent: "center",
         alignItems: "center",
-        borderWidth: 1,
-        borderColor: "rgba(0,0,0,0.06)",
     },
     logo: { width: 42, height: 40 },
 
     title: { color: "#102A43", fontWeight: "900", fontSize: 22 },
-    subTitle: {
-        marginTop: 4,
-        color: "rgba(16,42,67,0.55)",
-        fontWeight: "800",
-        fontSize: 12,
-    },
+    subTitle: { marginTop: 4, color: "rgba(16,42,67,0.55)", fontSize: 12 },
 
     searchBox: {
         marginHorizontal: 18,
         flexDirection: "row",
         alignItems: "center",
-        backgroundColor: "rgba(255,255,255,0.95)",
+        backgroundColor: "#fff",
         borderRadius: 18,
         paddingHorizontal: 14,
         paddingVertical: 12,
-        borderWidth: 1,
-        borderColor: "rgba(0,0,0,0.06)",
-        shadowColor: "#000",
-        shadowOpacity: 0.06,
-        shadowRadius: 14,
-        elevation: 6,
     },
-    searchIcon: {
-        color: "#37d06d",
-        fontSize: 18,
-        marginRight: 10,
-    },
-    searchInput: {
-        flex: 1,
-        color: "#102A43",
-        fontSize: 14,
-        fontWeight: "800",
-    },
+
+    searchIcon: { fontSize: 18, marginRight: 10 },
+    searchInput: { flex: 1, fontSize: 14 },
 
     card: {
         marginHorizontal: 18,
-        backgroundColor: "rgba(255,255,255,0.94)",
+        backgroundColor: "#fff",
         borderRadius: 22,
         padding: 14,
         marginBottom: 14,
-        borderWidth: 1,
-        borderColor: "rgba(0,0,0,0.05)",
-        shadowColor: "#000",
-        shadowOpacity: 0.06,
-        shadowRadius: 14,
-        elevation: 5,
     },
 
-    topRow: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "flex-start",
-        gap: 10,
-    },
-
+    topRow: { flexDirection: "row", justifyContent: "space-between" },
     leftRow: { flexDirection: "row", gap: 12, flex: 1 },
 
     avatarWrap: {
@@ -362,128 +414,38 @@ const styles = StyleSheet.create({
         height: 54,
         borderRadius: 20,
         overflow: "hidden",
-        backgroundColor: "rgba(55,208,109,0.14)",
-        justifyContent: "center",
-        alignItems: "center",
     },
     avatar: { width: 54, height: 54 },
 
-    docName: {
-        color: "#102A43",
-        fontWeight: "900",
-        fontSize: 16,
-    },
-
-    subRow: {
-        marginTop: 8,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-        flexWrap: "wrap",
-    },
-
+    docName: { fontWeight: "900", fontSize: 16 },
     specChip: {
+        marginTop: 8,
         paddingHorizontal: 10,
         paddingVertical: 6,
         borderRadius: 999,
         backgroundColor: "rgba(70,205,255,0.16)",
-        borderWidth: 1,
-        borderColor: "rgba(0,0,0,0.04)",
     },
-    specChipText: {
-        color: "#0f2f47",
-        fontWeight: "900",
-        fontSize: 11,
-    },
+    specChipText: { fontSize: 11, fontWeight: "900" },
 
-    badge: {
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 999,
-    },
-    badgeText: { fontSize: 12, fontWeight: "900" },
+    expandText: { fontSize: 12 },
 
-    expandText: {
-        color: "rgba(16,42,67,0.52)",
-        fontWeight: "900",
-        fontSize: 12,
-    },
-
-    metaRow: {
-        marginTop: 10,
-        flexDirection: "row",
-        alignItems: "center",
-        flexWrap: "wrap",
-        gap: 8,
-    },
-    metaItem: {
-        color: "rgba(16,42,67,0.78)",
-        fontWeight: "900",
-        fontSize: 12,
-    },
-    metaDot: { color: "rgba(16,42,67,0.28)", fontWeight: "900" },
-
-    smallLine: {
-        marginTop: 10,
-        color: "rgba(16,42,67,0.62)",
-        fontWeight: "800",
-        fontSize: 12,
-    },
-
-    visitLine: {
-        marginTop: 8,
-        color: "rgba(16,42,67,0.62)",
-        fontWeight: "800",
-        fontSize: 12,
-    },
+    metaLine: { marginTop: 8, fontSize: 12 },
 
     detailBox: {
         marginTop: 14,
         backgroundColor: "rgba(16,42,67,0.06)",
         padding: 14,
         borderRadius: 18,
-        borderWidth: 1,
-        borderColor: "rgba(0,0,0,0.05)",
     },
 
-    formTitle: {
-        color: "#102A43",
-        fontWeight: "900",
-        marginBottom: 12,
-        fontSize: 14,
-    },
-
-    label: {
-        color: "rgba(16,42,67,0.58)",
-        fontSize: 12,
-        marginBottom: 6,
-        marginTop: 10,
-        fontWeight: "900",
-    },
+    label: { marginTop: 10, marginBottom: 6, fontSize: 12 },
 
     input: {
-        backgroundColor: "rgba(255,255,255,0.96)",
+        backgroundColor: "#fff",
         borderRadius: 16,
         padding: 14,
-        color: "#102A43",
         fontSize: 14,
-        fontWeight: "800",
-        borderWidth: 1,
-        borderColor: "rgba(0,0,0,0.06)",
     },
-
-    slotWrap: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 10 },
-    slotBtn: {
-        paddingHorizontal: 12,
-        paddingVertical: 9,
-        borderRadius: 999,
-        backgroundColor: "rgba(255,255,255,0.9)",
-        borderWidth: 1,
-        borderColor: "rgba(0,0,0,0.05)",
-    },
-    slotBtnActive: { backgroundColor: "#102A43" },
-    slotText: { color: "rgba(16,42,67,0.70)", fontWeight: "900", fontSize: 12 },
-    slotTextActive: { color: "#fff" },
 
     bookBtn: {
         marginTop: 16,
@@ -491,16 +453,43 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         borderRadius: 16,
     },
-    bookText: {
-        textAlign: "center",
-        color: "#062118",
-        fontWeight: "900",
-        fontSize: 15,
-    },
+
+    bookText: { textAlign: "center", fontWeight: "900" },
 
     empty: {
-        color: "rgba(16,42,67,0.55)",
         textAlign: "center",
-        fontWeight: "800",
+        marginTop: 24,
+    },
+    slotContainer: {
+        maxHeight: 180,   
+    },
+
+    slotWrap: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        justifyContent: "space-between",
+    },
+
+    slotBtn: {
+        width: "30%",   
+        marginBottom: 10,
+        paddingVertical: 10,
+        borderRadius: 20,
+        backgroundColor: "#fff",
+        borderWidth: 1,
+        borderColor: "#ddd",
+        alignItems: "center",
+    },
+
+    slotBtnActive: {
+        backgroundColor: "#102A43",
+    },
+
+    slotText: {
+        fontSize: 12,
+    },
+
+    slotTextActive: {
+        color: "#fff",
     },
 });

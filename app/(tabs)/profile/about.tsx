@@ -9,7 +9,7 @@ import {
     Dimensions,
     Linking,
 } from "react-native";
-import { icons } from "@/constants/icons";
+import { icons } from "@/interfaces/constants/icons";
 
 const { width } = Dimensions.get("window");
 

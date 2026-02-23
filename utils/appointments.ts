@@ -1,14 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from "axios";
+import API_URL from "./api";
 
 const KEY = "appointments";
 
 export const saveAppointment = async (appointment: any) => {
-    const prev = await getAppointments();
-    const payload = [
-        ...prev,
-        { id: Date.now().toString(), createdAt: new Date().toISOString(), ...appointment },
-    ];
-    await AsyncStorage.setItem(KEY, JSON.stringify(payload));
+    await axios.post(`${API_URL}/appointment`, appointment);
 };
 
 export const getAppointments = async () => {
@@ -21,3 +18,14 @@ export const deleteAppointment = async (id: string) => {
     const next = prev.filter((a: any) => a.id !== id);
     await AsyncStorage.setItem(KEY, JSON.stringify(next));
 };
+
+export const isAvailable = async (doctorId: number, date: string, time: string) => {
+    const payload = {
+        doctorId,
+        date,
+        time
+    }
+
+    const res = await axios.post(`${API_URL}/appointment/availability`, payload);
+    return res.data;
+}

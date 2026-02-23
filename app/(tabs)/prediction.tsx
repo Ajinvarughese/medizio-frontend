@@ -8,13 +8,15 @@ import {
     ScrollView,
     Dimensions,
     Alert,
+    TextInput,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 
-import { icons } from "@/constants/icons";
+import { icons } from "@/interfaces/constants/icons";
 import { mockPredictions } from "@/mock/prediction";
+import { Picker } from "@react-native-picker/picker";
 
 const { width } = Dimensions.get("window");
 
@@ -27,6 +29,121 @@ export default function PredictDisease() {
     const [file, setFile] = useState<any>(null);
     const [predicting, setPredicting] = useState(false);
     const [result, setResult] = useState<any>(null);
+
+    // ADD this inside your component, after state declarations
+
+    const [formData, setFormData] = useState<any>({});
+
+    const handleInputChange = (key: string, value: string) => {
+        setFormData((prev: any) => ({
+            ...prev,
+            [key]: value,
+        }));
+    };
+
+    const renderInput = (label: string, key: string, type: string = "text") => (
+        <View style={styles.inputGroup} key={key}>
+        <Text style={styles.inputLabel}>{label}</Text>
+
+        {type === "dropdown" ? (
+            <View style={styles.pickerWrapper}>
+                <Picker
+                    selectedValue={formData[key]}
+                    onValueChange={(value) => handleInputChange(key, value)}
+                    dropdownIconColor="#102A43"
+                >
+                    <Picker.Item label="Select Gender" value="" />
+                    <Picker.Item label="Male" value="1" />
+                    <Picker.Item label="Female" value="0" />
+                </Picker>
+            </View>
+        ) : (
+            <TextInput
+                style={styles.formInput}
+                keyboardType="numeric"
+                placeholder={`Enter ${label}`}
+                placeholderTextColor="rgba(16,42,67,0.35)"
+                value={formData[key] || ""}
+                onChangeText={(text) => handleInputChange(key, text)}
+            />
+        )}
+    </View>
+    );
+
+    const renderDiseaseForm = () => {
+        switch (selectedDisease) {
+            case "diabetes":
+                return (
+                    <>
+                        {renderInput("Pregnancies", "Pregnancies")}
+                        {renderInput("Glucose", "Glucose")}
+                        {renderInput("Blood Pressure", "BloodPressure")}
+                        {renderInput("Skin Thickness", "SkinThickness")}
+                        {renderInput("Insulin", "Insulin")}
+                        {renderInput("BMI", "BMI")}
+                        {renderInput("Diabetes Pedigree Function", "DiabetesPedigreeFunction")}
+                        {renderInput("Age", "Age")}
+                    </>
+                );
+
+            case "heart":
+                return (
+                    <>
+                        {renderInput("Age", "age")}
+                        {renderInput("Gender", "sex", "dropdown")}
+                        {renderInput("Chest Pain Type", "cp")}
+                        {renderInput("Resting BP", "trestbps")}
+                        {renderInput("Cholesterol", "chol")}
+                        {renderInput("Fasting Blood Sugar", "fbs")}
+                        {renderInput("Rest ECG", "restecg")}
+                        {renderInput("Max Heart Rate", "thalach")}
+                        {renderInput("Exercise Induced Angina", "exang")}
+                        {renderInput("Oldpeak", "oldpeak")}
+                        {renderInput("Slope", "slope")}
+                        {renderInput("CA", "ca")}
+                        {renderInput("Thal", "thal")}
+                    </>
+                );
+
+            case "parkinson":
+                return (
+                    <>
+                        {renderInput("Fo", "fo")}
+                        {renderInput("Fhi", "fhi")}
+                        {renderInput("Flo", "flo")}
+                        {renderInput("Jitter %", "Jitter_percent")}
+                        {renderInput("Jitter Abs", "Jitter_Abs")}
+                        {renderInput("RAP", "RAP")}
+                        {renderInput("PPQ", "PPQ")}
+                        {renderInput("DDP", "DDP")}
+                        {renderInput("Shimmer", "Shimmer")}
+                        {renderInput("Shimmer dB", "Shimmer_dB")}
+                        {renderInput("APQ3", "APQ3")}
+                        {renderInput("APQ5", "APQ5")}
+                        {renderInput("APQ", "APQ")}
+                        {renderInput("DDA", "DDA")}
+                        {renderInput("NHR", "NHR")}
+                        {renderInput("HNR", "HNR")}
+                        {renderInput("RPDE", "RPDE")}
+                        {renderInput("DFA", "DFA")}
+                        {renderInput("Spread1", "spread1")}
+                        {renderInput("Spread2", "spread2")}
+                        {renderInput("D2", "D2")}
+                        {renderInput("PPE", "PPE")}
+                    </>
+                );
+
+            case "normal":
+                return (
+                    <Text style={styles.generalText}>
+                        General Check selected. Describe your symptoms to AI.
+                    </Text>
+                );
+
+            default:
+                return null;
+        }
+    };
 
     const diseaseOptions = useMemo(
         () => [
@@ -139,6 +256,25 @@ export default function PredictDisease() {
                             </TouchableOpacity>
                         );
                     })}
+                </View>
+            </View>
+
+            {/* Dynamic Disease Form */}
+            <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Enter Medical Parameters</Text>
+
+                <View style={styles.formCard}>
+                    {renderDiseaseForm()}
+                    <TouchableOpacity
+                        style={[styles.predictBtn, predicting && { opacity: 0.7 }]}
+                        onPress={runPrediction}
+                        disabled={predicting}
+                        activeOpacity={0.9}
+                    >
+                        <Text style={styles.predictText}>
+                            {predicting ? "Predicting..." : "Predict Disease"}
+                        </Text>
+                    </TouchableOpacity>
                 </View>
             </View>
 
@@ -417,4 +553,44 @@ const styles = StyleSheet.create({
         backgroundColor: "#102A43",
     },
     bookText: { textAlign: "center", fontWeight: "900", color: "#fff" },
+
+    formCard: {
+        marginTop: 12,
+        borderRadius: 24,
+        padding: 16,
+        backgroundColor: "rgba(255,255,255,0.94)",
+        borderWidth: 1,
+        borderColor: "rgba(0,0,0,0.05)",
+    },
+
+    inputGroup: {
+        marginBottom: 12,
+    },
+
+    inputLabel: {
+        fontWeight: "900",
+        color: "#102A43",
+        marginBottom: 6,
+        fontSize: 12,
+    },
+
+    formInput: {
+        backgroundColor: "#fff",
+        borderRadius: 14,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: "rgba(0,0,0,0.08)",
+    },
+
+    generalText: {
+        fontWeight: "800",
+        color: "rgba(16,42,67,0.75)",
+        fontSize: 14,
+    },
+    pickerWrapper: {
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: "rgba(0,0,0,0.08)",
+        backgroundColor: "#fff",
+    },
 });

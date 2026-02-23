@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
     View,
     Text,
@@ -11,17 +11,36 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Swipeable } from "react-native-gesture-handler";
-import { doctor } from "@/mock/doctor";
-import { doctorAppointments } from "@/mock/doctorAppointments";
+
+
+import { getUser } from "@/utils/auth";
+import { fetchDoctorAppointments } from "@/mock/doctorAppointments";
+import { dateClassify } from "@/utils/dateTime";
 
 const { width } = Dimensions.get("window");
 
 export default function DoctorHome() {
+    const [doctor, setDoctor] = useState({});
+    const [doctorAppointments, setDoctorAppointments] = useState([]);
+    
+    const fetchDoctor = async () => {
+        setDoctor(await getUser());
+    }
+
+    const fetchAppointments =async () => {
+        setDoctorAppointments(await fetchDoctorAppointments());
+    }
+    
+    useEffect(() => {
+        fetchDoctor();
+        fetchAppointments();
+    }, []);
+    console.log(doctor)
     const router = useRouter();
     const pulse = useRef(new Animated.Value(1)).current;
 
-    const todayAppointments = doctorAppointments.filter(a => a.date === "Today");
-
+    const todayAppointments = doctorAppointments.filter(a => dateClassify(a?.date) === "Today");
+    
     useEffect(() => {
         Animated.loop(
             Animated.sequence([
@@ -69,11 +88,11 @@ export default function DoctorHome() {
             <Text style={styles.sectionTitle}>Upcoming Appointments</Text>
 
             <ScrollView
-                horizontal
                 showsHorizontalScrollIndicator={false}
                 decelerationRate="fast"
                 snapToInterval={width * 0.72}
                 snapToAlignment="start"
+
             >
                 {doctorAppointments.slice(0, 5).map(item => (
                     <Swipeable
@@ -168,7 +187,13 @@ const styles = StyleSheet.create({
 
     sectionTitle: { marginTop: 28, marginBottom: 12, fontSize: 17, fontWeight: "900", color: "#102A43" },
 
-    appointmentCard: { width: width * 0.7, backgroundColor: "#ffffff", borderRadius: 22, padding: 16, marginRight: 14, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 10, elevation: 4 },
+    appointmentCard: {
+        width: width * 0.72,
+        marginTop: 16,   
+        backgroundColor: "#fff",
+        borderRadius: 20,
+        padding: 16,
+    },
 
     badge: { alignSelf: "flex-start", backgroundColor: "rgba(59,130,246,0.12)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginBottom: 8 },
     badgeText: { fontSize: 11, fontWeight: "700", color: "#3b82f6" },
