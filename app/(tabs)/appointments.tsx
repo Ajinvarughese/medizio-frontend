@@ -21,6 +21,7 @@ import { fetchAllDoctors } from "@/utils/doctor";
 import { isValidFutureDate } from "@/utils/dateTime";
 import { getUser } from "@/utils/auth";
 import axios from "axios";
+import API_URL from "@/utils/api";
 
 const { width } = Dimensions.get("window");
 
@@ -215,7 +216,7 @@ export default function AppointmentBooking() {
                                     <View style={styles.leftRow}>
                                         <View style={styles.avatarWrap}>
                                             <Image
-                                                source={{ uri: doc.picture }}
+                                                source={{ uri: doc.picture.replace("http://localhost:8080", API_URL) }}
                                                 style={styles.avatar}
                                             />
                                         </View>
@@ -260,7 +261,7 @@ export default function AppointmentBooking() {
                                 <TextInput
                                     value={selectedDate}
                                     onChangeText={setSelectedDate}
-                                    placeholder="YYYY-MM-DD"
+                                    placeholder="DD-MM-YYYY"
                                     style={styles.input}
                                 />
                                 {selectedDate.length > 0 && (

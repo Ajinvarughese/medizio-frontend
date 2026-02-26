@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
     View,
     Text,
@@ -6,38 +6,119 @@ import {
     ScrollView,
     TouchableOpacity,
     Dimensions,
+    TextInput,
 } from "react-native";
-import { patients } from "@/mock/patients";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { getDoctorAppointments } from "@/utils/appointments";
+import { calculateAge } from "@/utils/dateTime";
+import { useRouter } from "expo-router";
 
 const { width } = Dimensions.get("window");
 
 export default function Patients() {
+    const router = useRouter();
+    const [appointments, setAppointments] = useState<any[]>([]);
+    const [searchQuery, setSearchQuery] = useState("");
+
+    useEffect(() => {
+        loadPastAppointments();
+    }, []);
+
+    const loadPastAppointments = async () => {
+        const res = await getDoctorAppointments();
+
+        const pastAppointments = res.filter(
+            (item: any) =>
+                item.status === "RESOLVED" ||
+                item.status === "CANCELLED"
+        );
+
+        setAppointments(pastAppointments);
+    };
+
+    const filteredAppointments = appointments.filter((appointment) => {
+        if (!searchQuery.trim()) return true;
+
+        const query = searchQuery.toLowerCase();
+
+        return (
+            appointment.patient?.name?.toLowerCase().includes(query) ||
+            appointment.date?.toLowerCase().includes(query)
+        );
+    });
+
     return (
         <ScrollView style={styles.root} contentContainerStyle={{ paddingBottom: 100 }}>
             <View style={styles.bgBlob1} />
             <View style={styles.bgBlob2} />
 
-            <Text style={styles.header}>Recent Patients 👥</Text>
-            <Text style={styles.subHeader}>Patients you recently consulted</Text>
+            <Text style={styles.header}>Recent Appointments 👥</Text>
+            <Text style={styles.subHeader}>
+                Resolved & Cancelled appointments
+            </Text>
 
-            {patients.map((patient) => (
-                <View key={patient.id} style={styles.card}>
+            {/* SEARCH BAR */}
+            <View style={styles.searchContainer}>
+                <MaterialCommunityIcons
+                    name="magnify"
+                    size={20}
+                    color="#64748b"
+                />
+                <TextInput
+                    placeholder="Search by name or date..."
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    style={styles.searchInput}
+                    placeholderTextColor="#94a3b8"
+                />
+            </View>
+
+            {filteredAppointments.length === 0 && (
+                <Text style={{ color: "#64748b", marginTop: 20 }}>
+                    No past appointments found.
+                </Text>
+            )}
+
+            {filteredAppointments.map((appointment) => (
+                <View key={appointment.id} style={styles.card}>
                     <View style={styles.avatar}>
                         <Text style={styles.avatarText}>
-                            {patient.name.charAt(0)}
+                            {appointment.patient?.name?.charAt(0)}
                         </Text>
                     </View>
 
                     <View style={{ flex: 1 }}>
-                        <Text style={styles.name}>{patient.name}</Text>
-                        <Text style={styles.meta}>
-                            {patient.age} yrs • {patient.gender}
+                        <Text style={styles.name}>
+                            {appointment.patient?.name}
                         </Text>
-                        <Text style={styles.issue}>Issue: {patient.issue}</Text>
-                        <Text style={styles.date}>Last Visit: {patient.lastVisit}</Text>
 
-                        <TouchableOpacity style={styles.btn}>
-                            <Text style={styles.btnText}>View Details</Text>
+                        <Text style={styles.meta}>
+                            {calculateAge(appointment.patient?.dob)} yrs • {appointment.patient?.location}
+                        </Text>
+
+                        <Text style={styles.meta}>
+                            {appointment.patient?.email}
+                        </Text>
+
+                        <Text style={styles.issue}>
+                            Issue: {appointment.reason}
+                        </Text>
+
+                        <Text style={styles.date}>
+                            Visit Date: {appointment.date}
+                        </Text>
+
+                        <TouchableOpacity
+                            style={styles.btn}
+                            onPress={() =>
+                                router.push(
+                                    `/(doctor)/(tabs)/appointment?appointmentId=${appointment.id}`
+                                )
+                            }
+                        >
+                            <Text style={styles.btnText}>
+                                View Details
+                            </Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -70,6 +151,27 @@ const styles = StyleSheet.create({
 
     header: { fontSize: 24, fontWeight: "900", color: "#102A43" },
     subHeader: { fontSize: 13, color: "#64748b", marginBottom: 20 },
+
+    searchContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "#ffffff",
+        borderRadius: 14,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        marginBottom: 20,
+        shadowColor: "#000",
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        elevation: 2,
+    },
+
+    searchInput: {
+        flex: 1,
+        marginLeft: 8,
+        fontSize: 14,
+        color: "#102A43",
+    },
 
     card: {
         flexDirection: "row",
@@ -104,5 +206,17 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         width: 120,
     },
-    btnText: { textAlign: "center", fontWeight: "700", fontSize: 12, color: "#102A43" },
+    btnText: {
+        textAlign: "center",
+        fontWeight: "700",
+        fontSize: 12,
+        color: "#102A43",
+    },
+    statusBadge: {
+        marginTop: 8,
+        paddingVertical: 4,
+        paddingHorizontal: 10,
+        borderRadius: 12,
+        alignSelf: "flex-start",
+    },
 });

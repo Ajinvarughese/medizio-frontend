@@ -11,6 +11,7 @@ import {
     Pressable,
     Animated,
     Easing,
+    RefreshControl,
 } from "react-native";
 import { icons } from "@/interfaces/constants/icons";
 import { useRouter } from "expo-router";
@@ -18,6 +19,7 @@ import { useRouter } from "expo-router";
 import { appointments } from "@/mock/appointments";
 import { getUser } from "@/utils/auth";
 import { Patient } from "@/types/entity";
+import { deleteAppointment, getAppointments } from "@/utils/appointments";
 
 const { width } = Dimensions.get("window");
 
@@ -25,16 +27,33 @@ export default function Dashboard() {
     const router = useRouter();
 
     const [user, setUser] = useState<Patient | null>(null);
+    const [appointments, setAppointments] = useState([]);
+    const [expandedId, setExpandedId] = useState<number | null>(null);
+
+    const loadPatient = async () => {
+        const data = await getUser();
+        const appointmentRes = await getAppointments();
+        setAppointments(appointmentRes);
+        setUser(data);
+    };
 
     useEffect(() => {
-        const loadPatient = async () => {
-            const data = await getUser();
-            setUser(data);
-            console.log(data);
-        };
-
         loadPatient();
     }, []);
+
+    const handleCancel = async (id: number) => {
+        try {
+            await deleteAppointment(id);
+
+            setAppointments(prev =>
+                prev.filter(a => a.id !== id)
+            );
+
+            setExpandedId(null);
+        } catch (err) {
+            console.log(err);
+        }
+    };
 
 
     const [openMenu, setOpenMenu] = useState(false);
@@ -74,17 +93,54 @@ export default function Dashboard() {
         ]).start(() => setOpenMenu(false));
     };
 
+    const [refreshing, setRefreshing] = useState(false);
+
+    const onRefresh = async () => {
+        setRefreshing(true);
+        try {
+            const data = await getUser();
+            const appointmentRes = await getAppointments();
+
+            setUser(data);
+            setAppointments(appointmentRes);
+        } catch (err) {
+            console.log(err);
+        }
+        setRefreshing(false);
+    };
+
     const stats = useMemo(() => {
         const total = appointments.length;
-        const booked = appointments.filter((a) => a.status === "Booked").length;
-        const cancelled = appointments.filter((a) => a.status !== "Booked").length;
-        const upcoming = appointments.find((a) => a.status === "Booked");
-        return { total, booked, cancelled, upcoming };
-    }, []);
+
+        const bookedAppointments = appointments.filter(
+            (a) => a?.status === "BOOKED"
+        );
+
+        const cancelled = appointments.filter(
+            (a) => a?.status !== "BOOKED"
+        ).length;
+
+        return {
+            total,
+            booked: bookedAppointments.length,
+            cancelled,
+            upcomingList: bookedAppointments,
+        };
+    }, [appointments]);
 
     return (
         <View style={{ flex: 1 }}>
-            <ScrollView style={styles.root} contentContainerStyle={{ paddingBottom: 140 }}>
+            <ScrollView
+                style={styles.root}
+                contentContainerStyle={{ paddingBottom: 140 }}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={["#37d06d"]} // Android
+                        tintColor="#37d06d"  // iOS
+                    />
+                }>
                 <View style={styles.bgBlob1} />
                 <View style={styles.bgBlob2} />
 
@@ -117,30 +173,75 @@ export default function Dashboard() {
 
                 {/* UPCOMING */}
                 <SectionHeader title="Upcoming Appointment" sub="Your next scheduled visit" />
+                
+                {stats.upcomingList.length > 0 ? (
+                    <>
+                        {stats.upcomingList.map((appointment) => {
+                            const isExpanded = expandedId === appointment.id;
 
-                {stats.upcoming ? (
-                    <View style={styles.glassCard}>
-                        <View style={styles.upTop}>
-                            <View>
-                                <Text style={styles.upDoctor}>{stats.upcoming.doctorName}</Text>
-                                <Text style={styles.upSpec}>{stats.upcoming.specialization}</Text>
-                            </View>
-                            <View style={styles.badge}><Text style={styles.badgeText}>Booked</Text></View>
-                        </View>
+                            return (
+                                <View style={styles.glassCard} key={appointment.id}>
+                                    
+                                    {/* CLICKABLE HEADER */}
+                                    <TouchableOpacity
+                                        activeOpacity={0.8}
+                                        onPress={() =>
+                                            setExpandedId(isExpanded ? null : appointment.id)
+                                        }
+                                    >
+                                        <View style={styles.upTop}>
+                                            <View>
+                                                <Text style={styles.upDoctor}>
+                                                    {appointment.doctor?.name}
+                                                </Text>
+                                                <Text style={styles.upSpec}>
+                                                    {appointment.doctor?.speciality?.name}
+                                                </Text>
+                                            </View>
 
-                        <Text style={styles.upLine}>📅 {stats.upcoming.date}   🕒 {stats.upcoming.time}</Text>
-                        <Text style={styles.upLine}>🏥 {stats.upcoming.hospital}</Text>
-                        <Text style={styles.upLine}>📍 {stats.upcoming.location}</Text>
-                        <Text style={styles.upLine}>📝 {stats.upcoming.reason}</Text>
+                                            <Text style={{ fontSize: 18 }}>
+                                                {isExpanded ? "▲" : "▼"}
+                                            </Text>
+                                        </View>
 
-                        <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push("/(tabs)/appointments")}>
-                            <Text style={styles.primaryText}>Manage Appointment</Text>
-                        </TouchableOpacity>
-                    </View>
+                                        <Text style={styles.upLine}>
+                                            📅 {appointment.date}   🕒 {appointment.time}
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    {/* EXPANDED CONTENT */}
+                                    {isExpanded && (
+                                        <View style={{ marginTop: 12 }}>
+                                            <Text style={styles.upLine}>
+                                                📍 {appointment.doctor?.location}
+                                            </Text>
+
+                                            <Text style={styles.upLine}>
+                                                📝 {appointment.reason}
+                                            </Text>
+
+                                            <TouchableOpacity
+                                                style={styles.cancelBtn}
+                                                onPress={() => handleCancel(appointment.id)}
+                                            >
+                                                <Text style={styles.cancelText}>
+                                                    Cancel Appointment
+                                                </Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
+                                </View>
+                            );
+                        })}
+                    </>
                 ) : (
                     <View style={styles.glassCard}>
-                        <Text style={styles.emptyTitle}>No upcoming appointments</Text>
-                        <Text style={styles.emptyText}>Book an appointment to see it appear here.</Text>
+                        <Text style={styles.emptyTitle}>
+                            No upcoming appointments
+                        </Text>
+                        <Text style={styles.emptyText}>
+                            Book an appointment to see it appear here.
+                        </Text>
                     </View>
                 )}
 
@@ -273,4 +374,16 @@ const styles = StyleSheet.create({
     drawerIcon: { fontSize: 18 },
     drawerLabel: { fontSize: 14, fontWeight: "800", color: "#102A43" },
     patientName: { fontSize: 16, fontWeight: "900", marginBottom: 20, color: "#102A43" },
+    cancelBtn: {
+        marginTop: 14,
+        paddingVertical: 12,
+        borderRadius: 14,
+        backgroundColor: "rgba(239,68,68,0.15)",
+    },
+
+    cancelText: {
+        textAlign: "center",
+        fontWeight: "900",
+        color: "#dc2626",
+    },
 });

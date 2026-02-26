@@ -17,6 +17,10 @@ import { useRouter } from "expo-router";
 import { icons } from "@/interfaces/constants/icons";
 import { mockPredictions } from "@/mock/prediction";
 import { Picker } from "@react-native-picker/picker";
+import API_URL from "@/utils/api";
+import axios from "axios";
+import { getUser } from "@/utils/auth";
+import { extractFromFile } from "@/utils/predictionHistory";
 
 const { width } = Dimensions.get("window");
 
@@ -29,6 +33,8 @@ export default function PredictDisease() {
     const [file, setFile] = useState<any>(null);
     const [predicting, setPredicting] = useState(false);
     const [result, setResult] = useState<any>(null);
+
+    const [expanded, setExpanded] = useState(false);
 
     // ADD this inside your component, after state declarations
 
@@ -179,22 +185,84 @@ export default function PredictDisease() {
     };
 
     const pickDocument = async () => {
-        const picked = await DocumentPicker.getDocumentAsync({
-            type: ["application/pdf", "image/*"],
-            copyToCacheDirectory: true,
-            multiple: false,
-        });
+        try {
+            const picked = await DocumentPicker.getDocumentAsync({
+                type: ["application/pdf"],
+                copyToCacheDirectory: true,
+                multiple: false,
+            });
 
-        if (picked.canceled) return;
+            if (picked.canceled) return;
 
-        const doc = picked.assets[0];
-        setFile({
-            uri: doc.uri,
-            name: doc.name,
-            type: doc.mimeType,
-        });
-        setResult(null);
+            const doc = picked.assets[0];
+
+            // Clear previous prediction
+            setResult(null);
+            setPredicting(true);
+
+            // Save file locally for UI preview
+            setFile({
+                uri: doc.uri,
+                name: doc.name,
+                type: doc.mimeType || "application/pdf",
+            });
+
+            // Call backend extraction
+            const extracted = await extractFromFile(doc, selectedDisease);
+
+            if (!extracted || Object.keys(extracted).length === 0) {
+                Alert.alert("Extraction Failed", "No valid medical values found in PDF.");
+                return;
+            }
+
+            // Clean null values
+            const cleanedData: any = {};
+            Object.keys(extracted).forEach((key) => {
+                cleanedData[key] =
+                    extracted[key] !== null && extracted[key] !== undefined
+                        ? String(extracted[key])
+                        : "";
+            });
+
+            setFormData(cleanedData);
+
+            Alert.alert("Success", "Medical values extracted successfully!");
+
+        } catch (error: any) {
+            console.error("PDF Extraction Error:", error);
+            Alert.alert("Error", "Could not extract values from file.");
+        } finally {
+            setPredicting(false);
+        }
     };
+    
+    const handlePrediction = async () => {
+        const user = await getUser();
+        setPredicting(true);
+        try {
+            const res = await axios.post(`${API_URL}/disease/predict/${selectedDisease}?patientId=${user.id}`, formData); 
+            setResult(res.data);
+            setFormData({})
+        } catch (error) {
+            Alert.alert("Couldn't predict", "Something went wrong while prediction");
+        } finally {
+            setPredicting(false);
+        }
+        
+    }
+
+    const handleSave = async () => {
+        setPredicting(true);
+        try {
+            await axios.post(`${API_URL}/disease`, result); 
+            setResult(null);
+            setFormData({});
+        } catch (error) {
+            Alert.alert("Couldn't save", "Something went wrong while saving");
+        } finally {
+            setPredicting(false);
+        }
+    }
 
     const runPrediction = async () => {
         if (!file) {
@@ -259,7 +327,9 @@ export default function PredictDisease() {
                 </View>
             </View>
 
-            {/* Dynamic Disease Form */}
+            {!result && (
+                <View>
+                    {/* Dynamic Disease Form */}
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Enter Medical Parameters</Text>
 
@@ -267,7 +337,7 @@ export default function PredictDisease() {
                     {renderDiseaseForm()}
                     <TouchableOpacity
                         style={[styles.predictBtn, predicting && { opacity: 0.7 }]}
-                        onPress={runPrediction}
+                        onPress={handlePrediction}
                         disabled={predicting}
                         activeOpacity={0.9}
                     >
@@ -309,28 +379,16 @@ export default function PredictDisease() {
                             </Text>
 
                             <View style={styles.uploadActions}>
-                                <TouchableOpacity style={styles.ghostBtn} onPress={pickFromGallery}>
-                                    <Text style={styles.ghostText}>Upload Image</Text>
-                                </TouchableOpacity>
                                 <TouchableOpacity style={styles.ghostBtn} onPress={pickDocument}>
                                     <Text style={styles.ghostText}>Upload PDF</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
                     )}
-
-                    <TouchableOpacity
-                        style={[styles.predictBtn, predicting && { opacity: 0.7 }]}
-                        onPress={runPrediction}
-                        disabled={predicting}
-                        activeOpacity={0.9}
-                    >
-                        <Text style={styles.predictText}>
-                            {predicting ? "Predicting..." : "Predict Disease"}
-                        </Text>
-                    </TouchableOpacity>
                 </View>
             </View>
+                </View>
+            )}
 
             {/* Result */}
             {result && (
@@ -338,41 +396,62 @@ export default function PredictDisease() {
                     <Text style={styles.sectionTitle}>Prediction Result</Text>
 
                     <View style={styles.resultCard}>
-                        <Text style={styles.resultTitle}>{result.label}</Text>
+                        <Text style={styles.resultTitle}>{result.affected ? `Affected with ${result.disease?.toLowerCase()}` : `Not affected with ${result.disease?.toLowerCase()}`}</Text>
 
                         <View style={styles.resultRow}>
                             <View style={styles.metric}>
-                                <Text style={styles.metricValue}>{result.confidence}%</Text>
-                                <Text style={styles.metricLabel}>Confidence</Text>
+                                 <Text style={styles.metricLabel}>You are</Text>
+                                <Text style={styles.metricValue}>{(100 - result.confidence).toFixed(2)}%</Text>
+                                <Text style={styles.metricLabel}>Healthy</Text>
                             </View>
 
                             <View
                                 style={[
                                     styles.riskBadge,
-                                    result.risk === "High"
+                                    result.riskClass === "HIGH"
                                         ? styles.riskHigh
-                                        : result.risk === "Medium"
+                                        : result.riskClass === "RISKY"
                                             ? styles.riskMedium
                                             : styles.riskLow,
                                 ]}
                             >
-                                <Text style={styles.riskText}>{result.risk} Risk</Text>
+                                <Text style={styles.riskText}>{result.riskClass}</Text>
                             </View>
                         </View>
 
                         <Text style={styles.recoTitle}>Recommendations</Text>
-                        {result.tips.map((t: string, idx: number) => (
-                            <Text key={idx} style={styles.recoItem}>
-                                • {t}
+                        <>
+                            <Text
+                                style={styles.recoItem}
+                                numberOfLines={expanded ? undefined : 3}
+                            >
+                                {result.aiAnalysis}
                             </Text>
-                        ))}
+
+                            {result.aiAnalysis.length > 120 && (
+                                <TouchableOpacity onPress={() => setExpanded(!expanded)}>
+                                <Text style={styles.readMoreText}>
+                                    {expanded ? "Read Less ▲" : "Read More ▼"}
+                                </Text>
+                                </TouchableOpacity>
+                            )}
+                        </>
 
                         <TouchableOpacity
+                            disabled={predicting}
                             style={styles.bookBtn}
-                            onPress={() => router.push("/(tabs)/appointments")}
+                            onPress={handleSave}
                             activeOpacity={0.9}
                         >
-                            <Text style={styles.bookText}>Book Doctor Appointment</Text>
+                            <Text style={styles.bookText}>{predicting ? "Saving Result..." : "Save Result"}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            disabled={predicting}
+                            style={styles.bookBtnSecond}
+                            onPress={() => {setResult(null); setFile(null)}}
+                            activeOpacity={0.9}
+                        >
+                            <Text style={styles.bookText}>Do not save</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -532,25 +611,44 @@ const styles = StyleSheet.create({
     metricLabel: { marginTop: 4, fontWeight: "900", color: "rgba(15,47,71,0.55)", fontSize: 12 },
 
     riskBadge: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999 },
-    riskHigh: { backgroundColor: "rgba(239,68,68,0.14)" },
-    riskMedium: { backgroundColor: "rgba(245,158,11,0.14)" },
-    riskLow: { backgroundColor: "rgba(22,163,74,0.14)" },
+    riskHigh: { 
+    backgroundColor: "#d65858"   
+    },
+    riskMedium: { 
+    backgroundColor: "#e6ae65"
+    },
+    riskLow: { 
+    backgroundColor: "#3ede79"      
+    },
     riskText: { fontWeight: "900", color: "#102A43" },
 
     recoTitle: { marginTop: 16, fontWeight: "900", color: "#102A43" },
     recoItem: {
         marginTop: 8,
-        color: "rgba(16,42,67,0.75)",
-        fontWeight: "800",
-        fontSize: 12,
+        color: "rgba(16,42,67,0.55)",
+        fontWeight: "600",
+        fontSize: 13,
         lineHeight: 18,
+    },
+    readMoreText: {
+        marginTop: 6,
+        fontWeight: "900",
+        color: "#37d06d",
+        fontSize: 12,
     },
 
     bookBtn: {
         marginTop: 16,
         borderRadius: 18,
         paddingVertical: 14,
+        backgroundColor: "#37d06d",
+    },
+    bookBtnSecond: {
+        marginTop: 16,
+        borderRadius: 18,
+        paddingVertical: 14,
         backgroundColor: "#102A43",
+        opacity: 0.8
     },
     bookText: { textAlign: "center", fontWeight: "900", color: "#fff" },
 

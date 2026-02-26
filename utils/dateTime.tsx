@@ -1,8 +1,9 @@
-export const dateClassify = (dateTimeString: string): string => {
-  const inputDate = new Date(dateTimeString);
+export const dateClassify = (dateString: string): string => {
+  const [day, month, year] = dateString.split("-").map(Number);
+
+  const inputDate = new Date(year, month - 1, day); // month is 0-indexed
   const now = new Date();
 
-  // Remove time part for comparison
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const tomorrow = new Date(today);
   tomorrow.setDate(today.getDate() + 1);
@@ -49,4 +50,25 @@ export const isValidFutureDate = (dateStr: string): boolean => {
   today.setHours(0, 0, 0, 0); // remove time
 
   return date > today;
+};
+
+export const calculateAge = (dob: string): number => {
+  if (!dob) return 0;
+
+  const [day, month, year] = dob.split("-").map(Number);
+
+  const birthDate = new Date(year, month - 1, day); // month is 0-based
+  const today = new Date();
+
+  let age = today.getFullYear() - birthDate.getFullYear();
+
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  const dayDiff = today.getDate() - birthDate.getDate();
+
+  // If birthday hasn't occurred yet this year
+  if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
+    age--;
+  }
+
+  return age;
 };

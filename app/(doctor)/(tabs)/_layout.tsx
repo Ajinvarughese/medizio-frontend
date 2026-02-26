@@ -48,7 +48,7 @@ export default function DoctorTabsLayout() {
             />
 
             <Tabs.Screen
-                name="appointments"
+                name="appointment"
                 options={{
                     tabBarIcon: ({ focused }) => (
                         <TabIcon focused={focused} icon={icons.appointment} label="Schedule" />

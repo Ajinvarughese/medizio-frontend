@@ -14,17 +14,51 @@ import {
     getPredictionHistory,
     clearPredictionHistory,
 } from "@/utils/predictionHistory";
+import axios from "axios";
+import API_URL from "@/utils/api";
+import { getUser } from "@/utils/auth";
 
 const { width } = Dimensions.get("window");
+
+const ExpandableAnalysis = ({ text }: { text: string }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  if (!text) return null;
+
+  return (
+    <>
+      <Text
+        style={styles.recoItem}
+        numberOfLines={expanded ? undefined : 3}
+      >
+        {text}
+      </Text>
+
+      {text.length > 120 && (
+        <TouchableOpacity onPress={() => setExpanded(!expanded)}>
+          <Text style={styles.readMoreText}>
+            {expanded ? "Read Less ▲" : "Read More ▼"}
+          </Text>
+        </TouchableOpacity>
+      )}
+    </>
+  );
+};
 
 export default function Progress() {
     const [history, setHistory] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [expanded, setExpanded] = useState(false);
+
+    const fetchPrediction = async () => {
+        const user = await getUser();
+        const res = await axios.get(`${API_URL}/disease?patientId=${user.id}`);
+        setHistory(res.data.reverse());
+    }
 
     const load = async () => {
         setLoading(true);
-        const all = await getPredictionHistory();
-        setHistory(all.reverse()); // latest first
+        await fetchPrediction();
         setLoading(false);
     };
 
@@ -34,8 +68,7 @@ export default function Progress() {
 
     // chart confidence values (oldest -> latest)
     const chartData = useMemo(() => {
-        const points = [...history].reverse();
-        return points.map((h) => Number(h.confidence || 0));
+        return history.map((h) => Number(h.confidence || 0));
     }, [history]);
 
     const trend = useMemo(() => {
@@ -102,50 +135,46 @@ export default function Progress() {
             <View style={styles.section}>
                 <View style={styles.sectionRow}>
                     <Text style={styles.sectionTitle}>Prediction History</Text>
-
-                    {history.length > 0 && (
-                        <TouchableOpacity
-                            style={styles.clearBtn}
-                            onPress={() => {
-                                Alert.alert("Clear History?", "This will delete all saved results.", [
-                                    { text: "Cancel", style: "cancel" },
-                                    {
-                                        text: "Clear",
-                                        style: "destructive",
-                                        onPress: async () => {
-                                            await clearPredictionHistory();
-                                            await load();
-                                        },
-                                    },
-                                ]);
-                            }}
-                        >
-                            <Text style={styles.clearText}>Clear</Text>
-                        </TouchableOpacity>
-                    )}
                 </View>
+                {history.map((h, index) => (
+                    <View key={index} style={styles.section}>
 
-                {history.map((h) => (
-                    <View key={h.id} style={styles.historyCard}>
-                        <View style={styles.hTop}>
-                            <Text style={styles.hTitle} numberOfLines={1}>
-                                {h.label}
-                            </Text>
-                            <Text style={styles.hConfidence}>{h.confidence}%</Text>
-                        </View>
-
-                        <Text style={styles.hSub}>
-                            {String(h.diseaseType || "disease").toUpperCase()} •{" "}
-                            {new Date(h.createdAt).toDateString()}
+                        <View style={styles.resultCard}>
+                        <Text style={styles.resultTitle}>
+                            {h.affected
+                            ? `Affected with ${h.disease?.toLowerCase()}`
+                            : `Not affected with ${h.disease?.toLowerCase()}`}
                         </Text>
 
-                        {h.fileName && <Text style={styles.hFile}>📎 {h.fileName}</Text>}
+                        <View style={styles.resultRow}>
+                            <View style={styles.metric}>
+                            <Text style={styles.metricLabel}>You are</Text>
+                            <Text style={styles.metricValue}>
+                                {(100 - Number(h.confidence)).toFixed(2)}%
+                            </Text>
+                            <Text style={styles.metricLabel}>Healthy</Text>
+                            </View>
 
-                        <View style={styles.badge}>
-                            <Text style={styles.badgeText}>Risk: {h.risk}</Text>
+                            <View
+                            style={[
+                                styles.riskBadge,
+                                h.riskClass === "HIGH"
+                                ? styles.riskHigh
+                                : h.riskClass === "RISKY"
+                                ? styles.riskMedium
+                                : styles.riskLow,
+                            ]}
+                            >
+                            <Text style={styles.riskText}>{h.riskClass}</Text>
+                            </View>
+                        </View>
+
+                        <Text style={styles.recoTitle}>Recommendations</Text>
+
+                        <ExpandableAnalysis text={h.aiAnalysis} />
                         </View>
                     </View>
-                ))}
+                    ))}
             </View>
         </ScrollView>
     );
@@ -279,4 +308,90 @@ const styles = StyleSheet.create({
         alignSelf: "flex-start",
     },
     badgeText: { fontWeight: "900", color: "#0f2f47", fontSize: 12 },
+
+    resultCard: {
+  marginTop: 12,
+  borderRadius: 24,
+  padding: 16,
+  backgroundColor: "rgba(255,255,255,0.94)",
+  borderWidth: 1,
+  borderColor: "rgba(0,0,0,0.05)",
+},
+
+resultTitle: {
+  fontWeight: "900",
+  color: "#102A43",
+  fontSize: 16,
+},
+
+resultRow: {
+  marginTop: 14,
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+},
+
+metric: {
+  backgroundColor: "rgba(70,205,255,0.14)",
+  paddingHorizontal: 14,
+  paddingVertical: 12,
+  borderRadius: 18,
+},
+
+metricValue: {
+  fontWeight: "900",
+  color: "#0f2f47",
+  fontSize: 18,
+},
+
+metricLabel: {
+  marginTop: 4,
+  fontWeight: "900",
+  color: "rgba(15,47,71,0.55)",
+  fontSize: 12,
+},
+
+riskBadge: {
+  paddingHorizontal: 14,
+  paddingVertical: 10,
+  borderRadius: 999,
+},
+
+riskHigh: {
+  backgroundColor: "#d65858",
+},
+
+riskMedium: {
+  backgroundColor: "#e6ae65",
+},
+
+riskLow: {
+  backgroundColor: "#3ede79",
+},
+
+riskText: {
+  fontWeight: "900",
+  color: "#102A43",
+},
+
+recoTitle: {
+  marginTop: 16,
+  fontWeight: "900",
+  color: "#102A43",
+},
+
+recoItem: {
+  marginTop: 8,
+  color: "rgba(16,42,67,0.55)",
+  fontWeight: "600",
+  fontSize: 13,
+  lineHeight: 18,
+},
+
+readMoreText: {
+  marginTop: 6,
+  fontWeight: "900",
+  color: "#37d06d",
+  fontSize: 12,
+},
 });

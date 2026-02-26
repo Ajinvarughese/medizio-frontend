@@ -29,6 +29,7 @@ export default function DoctorSidebar() {
             {/* PROFILE HEADER */}
             <View style={styles.headerCard}>
                 <View style={styles.avatar}>
+                    {console.log(doctor)}
                     <Image source={doctor?.picture} resizeMode="cover" style={styles.avatar} />
                 </View>
 
@@ -52,7 +53,7 @@ export default function DoctorSidebar() {
 
             {/* MAIN SECTION */}
             <Text style={styles.sectionTitle}>MAIN</Text>
-            <MenuItem icon="📅" label="My Schedule" onPress={() => router.push("/(doctor)/(tabs)/appointments")} />
+            <MenuItem icon="📅" label="My Schedule" onPress={() => router.push("/(doctor)/(tabs)/appointment")} />
             <MenuItem icon="🧑‍⚕️" label="Patients" onPress={() => router.push("/(doctor)/(tabs)/patients")} />
             <MenuItem icon="📁" label="Reports Center" onPress={() => router.push("/(doctor)/(tabs)/reports")} />
 

@@ -16,6 +16,7 @@ import { Swipeable } from "react-native-gesture-handler";
 import { getUser } from "@/utils/auth";
 import { fetchDoctorAppointments } from "@/mock/doctorAppointments";
 import { dateClassify } from "@/utils/dateTime";
+import { appointments } from "@/mock/appointments";
 
 const { width } = Dimensions.get("window");
 
@@ -28,7 +29,8 @@ export default function DoctorHome() {
     }
 
     const fetchAppointments =async () => {
-        setDoctorAppointments(await fetchDoctorAppointments());
+        const res = await fetchDoctorAppointments();
+        setDoctorAppointments(res.filter((item) => item.status === "BOOKED"));
     }
     
     useEffect(() => {
@@ -63,7 +65,7 @@ export default function DoctorHome() {
 
                 <View>
                     <Text style={styles.greeting}>Good Morning</Text>
-                    <Text style={styles.name}>Dr. {doctor.name}</Text>
+                    <Text style={styles.name}>Dr. {doctor?.name}</Text>
                 </View>
 
                 {/* Live Heartbeat Status */}
@@ -86,7 +88,19 @@ export default function DoctorHome() {
 
             {/* UPCOMING APPOINTMENTS CAROUSEL */}
             <Text style={styles.sectionTitle}>Upcoming Appointments</Text>
-
+            {doctorAppointments.length <= 0 && (
+                <View style={styles.emptyCard}>
+                    <View style={styles.emptyIconWrapper}>
+                        <Text style={styles.emptyIcon}>📅</Text>
+                    </View>
+                    <Text style={styles.emptyTitle}>
+                        No Upcoming Appointments
+                    </Text>
+                    <Text style={styles.emptySubtitle}>
+                        You’re all caught up! New bookings will appear here.
+                    </Text>
+                </View>
+            )}
             <ScrollView
                 showsHorizontalScrollIndicator={false}
                 decelerationRate="fast"
@@ -96,7 +110,7 @@ export default function DoctorHome() {
             >
                 {doctorAppointments.slice(0, 5).map(item => (
                     <Swipeable
-                        key={item.id}
+                        key={item?.id}
                         renderRightActions={() => (
                             <View style={styles.swipeAction}>
                                 <Text style={styles.swipeText}>✓ Done</Text>
@@ -107,21 +121,16 @@ export default function DoctorHome() {
                             <View style={styles.badge}>
                                 <Text style={styles.badgeText}>{item.status}</Text>
                             </View>
-                            <Text style={styles.patientName}>{item.patientName}</Text>
-                            <Text style={styles.spec}>{item.specialization}</Text>
-                            <Text style={styles.time}>🕒 {item.time}</Text>
+                            <Text style={styles.patientName}>{item.patient.name}</Text>
+                            <Text style={styles.spec}>{item.reason}</Text>
+                            <Text style={styles.time}>📆{item.date} 🕒 {item.time}</Text>
                         </View>
                     </Swipeable>
                 ))}
             </ScrollView>
 
             {/* RECENT PATIENTS */}
-            <Text style={styles.sectionTitle}>Recent Patients</Text>
-            <View style={styles.glassCard}>
-                <Text style={styles.listItem}>👩‍🦰 Priya S — Fever Follow-up</Text>
-                <Text style={styles.listItem}>👨 Rahul M — Diabetes Check</Text>
-                <Text style={styles.listItem}>👩 Anjali K — Heart Consultation</Text>
-            </View>
+            
 
             {/* WEEK STATS */}
             <Text style={styles.sectionTitle}>This Week</Text>
@@ -215,4 +224,44 @@ const styles = StyleSheet.create({
 
     alertCard: { backgroundColor: "#fff7ed", padding: 16, borderRadius: 16 },
     alertText: { color: "#9a3412", fontWeight: "600" },
+
+    emptyCard: {
+        backgroundColor: "#ffffff",
+        borderRadius: 20,
+        padding: 24,
+        alignItems: "center",
+        justifyContent: "center",
+        marginTop: 10,
+        shadowColor: "#000",
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 3,
+    },
+
+    emptyIconWrapper: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: "rgba(34,197,94,0.12)",
+        alignItems: "center",
+        justifyContent: "center",
+        marginBottom: 14,
+    },
+
+    emptyIcon: {
+        fontSize: 26,
+    },
+
+    emptyTitle: {
+        fontSize: 15,
+        fontWeight: "900",
+        color: "#102A43",
+    },
+
+    emptySubtitle: {
+        fontSize: 12,
+        color: "#64748b",
+        marginTop: 6,
+        textAlign: "center",
+    },
 });
