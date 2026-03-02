@@ -55,6 +55,23 @@ export default function AppointmentBooking() {
         loadData();
     }, []);
 
+    const sortDays = (days: string[] = []) => {
+        const order = [
+            "sunday",
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday"
+        ];
+
+        return [...days].sort(
+            (a, b) =>
+                order.indexOf(a.toLowerCase()) -
+                order.indexOf(b.toLowerCase())
+        );
+    };
     const checkAvailability = async () => {
 
         if (!selectedDate || !selectedTime || !expandedId || !isValidFutureDate(selectedDate)) return;
@@ -94,8 +111,8 @@ export default function AppointmentBooking() {
     };
 
     const handleBook = async (doc: any) => {
-        if (!selectedDate || !reason || !selectedTime) {
-            Alert.alert("Missing Info", "Please enter Date and Reason.");
+        if (!selectedDate || !selectedTime) {
+            Alert.alert("Missing Info", "Please enter Date and select a time.");
             return;
         }
 
@@ -115,19 +132,22 @@ export default function AppointmentBooking() {
         }  
         try {
             await saveAppointment(payload);
+            Alert.alert("Appointment Booked ✅", `Booked with ${doc.name}`);
+            setExpandedId(null);
+            setSelectedDate("");
+            setReason("");
+            setAvailability(null);
         } catch (error) {
             if(axios.isAxiosError(error)) {
                 if(error.response?.status === 409) {
-                    Alert.alert("Appointment Conflict", "Appointment already exists for this time.");
+                    if(Platform.OS == "web") {
+                        alert("Doctor is not available");
+                    } else {
+                        Alert.alert("Appointment Conflict", "Appointment already exists for this time.");
+                    }
                 }
             }
-        }
-
-        Alert.alert("Appointment Booked ✅", `Booked with ${doc.name}`);
-        setExpandedId(null);
-        setSelectedDate("");
-        setReason("");
-        setAvailability(null);
+        } 
     };
 
     const generateTimeSlots = (start: string, end: string) => {
@@ -163,6 +183,10 @@ export default function AppointmentBooking() {
 
         return slots;
     };
+
+    const replaceUrl = (url : string) => {
+        return url.replace("http://localhost:8080/api", API_URL)                                           
+    }
 
     return (
         <ScrollView style={styles.root} contentContainerStyle={{ paddingBottom: 120 }}>
@@ -216,7 +240,7 @@ export default function AppointmentBooking() {
                                     <View style={styles.leftRow}>
                                         <View style={styles.avatarWrap}>
                                             <Image
-                                                source={{ uri: doc.picture.replace("http://localhost:8080", API_URL) }}
+                                                source={{uri: replaceUrl(doc?.picture)}}
                                                 style={styles.avatar}
                                             />
                                         </View>
@@ -269,7 +293,16 @@ export default function AppointmentBooking() {
                                         <Text style={{color: "red", marginLeft: 5}}>Please enter a valid date</Text>
                                         ) : ""
                                 )}
-
+                                <Text style={styles.subTitle}>Unavailable Days</Text>
+                                <View style={styles.unavailableWrap}>
+                                    {sortDays(doc?.unavailableDays).map((day: string) => (
+                                        <View key={day} style={styles.unavailableChip}>
+                                            <Text style={styles.unavailableText}>
+                                                {day.charAt(0).toUpperCase() + day.slice(1).toLowerCase()}
+                                            </Text>
+                                        </View>
+                                    ))}
+                                </View>
                                 <Text style={styles.label}>Select Time</Text>
 
                                 <ScrollView
@@ -493,4 +526,23 @@ const styles = StyleSheet.create({
     slotTextActive: {
         color: "#fff",
     },
+    unavailableWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 8,
+    gap: 6,
+},
+
+unavailableChip: {
+    backgroundColor: "rgba(239,68,68,0.12)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+},
+
+unavailableText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#dc2626",
+},
 });

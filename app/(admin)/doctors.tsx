@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
     View,
     Text,
@@ -7,98 +7,190 @@ import {
     TouchableOpacity,
     Image,
 } from "react-native";
-import { doctors as mockDoctors } from "@/mock/doctors";
+
+import { deleteDoctor, fetchAllDoctors, updateDoctorStatus, verifyDoctor } from "@/utils/doctor";
+import API_URL from "@/utils/api";
+import axios from "axios";
 
 export default function AdminDoctors() {
-    const [doctors, setDoctors] = useState(mockDoctors);
+    const [doctors, setDoctors] = useState([]);
+    const [tab, setTab] = useState<"ACTIVE" | "SUSPENDED" | "PENDING">("ACTIVE");
+    const [expandedId, setExpandedId] = useState<string | null>(null);
 
-    const updateStatus = (id: string, status: string) => {
-        setDoctors((prev) =>
-            prev.map((doc) =>
-                doc.id === id ? { ...doc, status } : doc
-            )
-        );
+    const toggleExpand = (id: string) => {
+        setExpandedId((prev) => (prev === id ? null : id));
     };
+    const load = async () => {
+        const doc = await fetchAllDoctors();
+        setDoctors(doc)   
+    }
+
+    const filteredDoctors = doctors.filter((doc) => {
+        if (tab === "PENDING") return !doc.verified;
+        if (tab === "ACTIVE") return doc.verified && doc.accountStatus === "ACTIVE";
+        if (tab === "SUSPENDED") return doc.verified && doc.accountStatus === "SUSPENDED";
+        return true;
+    });
+
+    useEffect(() => {
+        load();
+    }, [])
+
+    const replaceUrl = (url : string ="") => {
+        return url?.replace("http://localhost:8080/api", API_URL )                                           
+    }
+
+    const handleUpdateStatus = async (id : number, accountStatus : string) => {
+        try {
+            const payload = {
+                id,
+                accountStatus
+            }
+            await updateDoctorStatus(payload);
+            load();
+        } catch (error) {
+            console.log(error)
+        }
+    }
+
+    const handleVerify = async (id : number) => {
+        try {
+            const payload = {
+                id
+            }
+            await verifyDoctor(payload);
+            load();
+        } catch (error) {
+            console.log(error)
+        }
+    }
+
+    const handleDelete = async (id : number) => {
+        try {
+            await deleteDoctor(id);
+            load();
+        } catch (error) {
+            console.log(error)
+        }
+    }
+   
 
     return (
         <ScrollView style={styles.root} contentContainerStyle={{ paddingBottom: 120 }}>
             <Text style={styles.header}>Manage Doctors</Text>
+            <View style={styles.tabs}>
+                <TouchableOpacity
+                    style={[styles.tabBtn, tab === "ACTIVE" && styles.tabActive]}
+                    onPress={() => setTab("ACTIVE")}
+                >
+                    <Text style={[styles.tabText, tab === "ACTIVE" && styles.tabTextActive]}>
+                        Active
+                    </Text>
+                </TouchableOpacity>
 
-            {doctors.map((doc) => (
-                <View key={doc.id} style={styles.card}>
-                    {/* TOP BADGES */}
-                    <View style={styles.badgeRow}>
-                        <View style={styles.ratingBadge}>
-                            <Text style={styles.ratingText}>⭐ {doc.rating}</Text>
-                        </View>
+                <TouchableOpacity
+                    style={[styles.tabBtn, tab === "SUSPENDED" && styles.tabActive]}
+                    onPress={() => setTab("SUSPENDED")}
+                >
+                    <Text style={[styles.tabText, tab === "SUSPENDED" && styles.tabTextActive]}>
+                        Suspended
+                    </Text>
+                </TouchableOpacity>
 
-                        <View style={styles.feeBadge}>
-                            <Text style={styles.feeText}>₹{doc.fee}/hr</Text>
-                        </View>
-                    </View>
+                <TouchableOpacity
+                    style={[styles.tabBtn, tab === "PENDING" && styles.tabActive]}
+                    onPress={() => setTab("PENDING")}
+                >
+                    <Text style={[styles.tabText, tab === "PENDING" && styles.tabTextActive]}>
+                        Pending
+                    </Text>
+                </TouchableOpacity>
+            </View>
+            {filteredDoctors.map((doc) => {
+                const expanded = expandedId === doc.id;
 
-                    {/* CONTENT */}
-                    <View style={styles.contentRow}>
-                        <View style={{ flex: 1 }}>
-                            <Text style={styles.name}>{doc.name}</Text>
-                            <Text style={styles.special}>{doc.specialization}</Text>
-                            <Text style={styles.meta}>
-                                {doc.experience} yrs • {doc.hospital}
-                            </Text>
+                return (
+                    <TouchableOpacity
+                        key={doc.id}
+                        style={styles.card}
+                        activeOpacity={0.9}
+                        onPress={() => toggleExpand(doc.id)}
+                    >
+                        <View style={styles.topRow}>
+                            <Image
+                                source={{ uri: replaceUrl(doc?.picture) }}
+                                resizeMode="cover"
+                                style={styles.avatar}
+                            />
 
-                            {/* STATUS */}
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.name}>Dr. {doc.name}</Text>
+                                <Text style={styles.special}>{doc.specialization}</Text>
+
+                                <Text style={styles.meta}>
+                                    📍 {doc.location}
+                                </Text>
+
+                                <View style={styles.infoRow}>
+                                    <Text style={styles.info}>⭐ {doc.rating}</Text>
+                                    <Text style={styles.info}>💼 {doc.experience} yrs</Text>
+                                    <Text style={styles.info}>
+                                        {doc.verified ? "✅ Verified" : "❌ Unverified"}
+                                    </Text>
+                                </View>
+                            </View>
+
                             <View
                                 style={[
                                     styles.statusBadge,
-                                    doc.status === "Approved"
+                                    doc.accountStatus === "ACTIVE"
                                         ? styles.approved
                                         : styles.pending,
                                 ]}
                             >
-                                <Text
-                                    style={[
-                                        styles.statusText,
-                                        doc.status === "Approved"
-                                            ? { color: "#16a34a" }
-                                            : { color: "#f59e0b" },
-                                    ]}
-                                >
-                                    {doc.status}
+                                <Text style={styles.statusText}>
+                                    {doc.accountStatus}
                                 </Text>
                             </View>
-
-                            {/* ACTIONS */}
-                            {doc.status === "Pending" && (
-                                <View style={styles.buttonRow}>
-                                    <TouchableOpacity
-                                        style={styles.approveBtn}
-                                        onPress={() => updateStatus(doc.id, "Approved")}
-                                    >
-                                        <Text style={styles.approveText}>Approve</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity
-                                        style={styles.rejectBtn}
-                                        onPress={() => updateStatus(doc.id, "Rejected")}
-                                    >
-                                        <Text style={styles.rejectText}>Reject</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            )}
                         </View>
 
-                        {/* RIGHT SIDE IMAGE PLACEHOLDER */}
-                        <View style={styles.imageBox}>
-                            <Text style={styles.imageText}>
-                                {doc.name.charAt(0)}
-                            </Text>
-                        </View>
-                    </View>
-                </View>
-            ))}
+                        {expanded && (
+                            <View style={styles.expandSection}>
+                                
+                                {tab === "ACTIVE" && (
+                                    <TouchableOpacity onPress={() => {handleUpdateStatus(doc?.id, "SUSPENDED");}} style={styles.suspendBtn}>
+                                        <Text style={styles.btnText}>Suspend</Text>
+                                    </TouchableOpacity>
+                                )}
+
+                                {tab === "SUSPENDED" && (
+                                    <TouchableOpacity onPress={() => {handleUpdateStatus(doc?.id, "ACTIVE")}} style={styles.activateBtn}>
+                                        <Text style={styles.btnText}>Make Active</Text>
+                                    </TouchableOpacity>
+                                )}
+
+                                {tab === "PENDING" && (
+                                    <View style={styles.buttonRow}>
+                                        <TouchableOpacity onPress={() => {handleVerify(doc?.id)}} style={styles.verifyBtn}>
+                                            <Text style={styles.btnText}>Verify</Text>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity onPress={() => {handleDelete(doc?.id)}} style={styles.deleteBtn}>
+                                            <Text style={styles.btnText}>Delete</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+
+                            </View>
+                        )}
+                    </TouchableOpacity>
+                );
+            })}
         </ScrollView>
     );
 }
+
+
 const styles = StyleSheet.create({
     root: {
         flex: 1,
@@ -114,51 +206,64 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
 
+    tabs: {
+        flexDirection: "row",
+        marginBottom: 20,
+        backgroundColor: "#e2f8ea",
+        padding: 4,
+        borderRadius: 16,
+    },
+
+    tabBtn: {
+        flex: 1,
+        paddingVertical: 10,
+        borderRadius: 12,
+        alignItems: "center",
+    },
+
+    tabActive: {
+        backgroundColor: "#37d06d",
+    },
+
+    tabText: {
+        fontSize: 13,
+        fontWeight: "700",
+        color: "#064e3b",
+    },
+
+    tabTextActive: {
+        color: "#ffffff",
+    },
+
     card: {
         backgroundColor: "#ffffff",
-        borderRadius: 28,
+        borderRadius: 22,
         padding: 18,
-        marginBottom: 18,
+        marginBottom: 16,
         shadowColor: "#000",
-        shadowOpacity: 0.06,
-        shadowRadius: 14,
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 3,
     },
 
-    badgeRow: {
-        flexDirection: "row",
-        marginBottom: 12,
-    },
-
-    ratingBadge: {
-        backgroundColor: "#ecfdf5",
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 12,
-        marginRight: 8,
-    },
-
-    ratingText: {
-        fontSize: 12,
-        fontWeight: "800",
-        color: "#16a34a",
-    },
-
-    feeBadge: {
-        backgroundColor: "#e0f2fe",
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 12,
-    },
-
-    feeText: {
-        fontSize: 12,
-        fontWeight: "800",
-        color: "#0284c7",
-    },
-
-    contentRow: {
+    topRow: {
         flexDirection: "row",
         alignItems: "center",
+    },
+
+    avatar: {
+        width: 55,
+        height: 55,
+        borderRadius: 5,
+        justifyContent: "center",
+        alignItems: "center",
+        marginRight: 10,
+    },
+
+    avatarText: {
+        fontSize: 24,
+        fontWeight: "900",
+        color: "#fff",
     },
 
     name: {
@@ -169,61 +274,75 @@ const styles = StyleSheet.create({
 
     special: {
         fontSize: 13,
-        color: "#37d06d",
         fontWeight: "700",
+        color: "#37d06d",
         marginTop: 2,
     },
 
     meta: {
         fontSize: 12,
         color: "#64748b",
+        marginTop: 4,
+    },
+
+    infoRow: {
+        flexDirection: "row",
         marginTop: 6,
+        gap: 10,
+    },
+
+    info: {
+        fontSize: 11,
+        color: "#475569",
+        fontWeight: "600",
     },
 
     statusBadge: {
-        marginTop: 8,
         paddingHorizontal: 10,
         paddingVertical: 6,
         borderRadius: 12,
-        alignSelf: "flex-start",
+        marginLeft: 10,
     },
 
     approved: {
-        backgroundColor: "#ecfdf5",
+        backgroundColor: "rgba(34,197,94,0.15)",
     },
 
     pending: {
-        backgroundColor: "#fef3c7",
+        backgroundColor: "rgba(251,191,36,0.2)",
     },
 
     statusText: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: "800",
+        color: "#102A43",
     },
 
     buttonRow: {
         flexDirection: "row",
-        marginTop: 12,
+        marginTop: 14,
     },
 
     approveBtn: {
+        flex: 1,
         backgroundColor: "#37d06d",
-        paddingVertical: 10,
-        paddingHorizontal: 16,
-        borderRadius: 16,
-        marginRight: 10,
+        paddingVertical: 12,
+        borderRadius: 14,
+        alignItems: "center",
+        marginRight: 8,
     },
 
     approveText: {
-        color: "#062118",
+        color: "#052e16",
         fontWeight: "900",
     },
 
     rejectBtn: {
+        flex: 1,
         backgroundColor: "#ef4444",
-        paddingVertical: 10,
-        paddingHorizontal: 16,
-        borderRadius: 16,
+        paddingVertical: 12,
+        borderRadius: 14,
+        alignItems: "center",
     },
 
     rejectText: {
@@ -231,19 +350,47 @@ const styles = StyleSheet.create({
         fontWeight: "900",
     },
 
-    imageBox: {
-        width: 80,
-        height: 80,
-        borderRadius: 24,
-        backgroundColor: "#37d06d",
-        justifyContent: "center",
-        alignItems: "center",
-        marginLeft: 16,
+    expandSection: {
+        marginTop: 16,
+        borderTopWidth: 1,
+        borderTopColor: "#e2e8f0",
+        paddingTop: 14,
     },
 
-    imageText: {
-        fontSize: 28,
-        fontWeight: "900",
-        color: "#fff",
+    suspendBtn: {
+        backgroundColor: "#f59e0b",
+        paddingVertical: 12,
+        borderRadius: 12,
+        alignItems: "center",
+    },
+
+    activateBtn: {
+        backgroundColor: "#16a34a",
+        paddingVertical: 12,
+        borderRadius: 12,
+        alignItems: "center",
+    },
+
+    verifyBtn: {
+        flex: 1,
+        backgroundColor: "#22c55e",
+        paddingVertical: 12,
+        borderRadius: 12,
+        alignItems: "center",
+        marginRight: 8,
+    },
+
+    deleteBtn: {
+        flex: 1,
+        backgroundColor: "#ef4444",
+        paddingVertical: 12,
+        borderRadius: 12,
+        alignItems: "center",
+    },
+
+    btnText: {
+        color: "#ffffff",
+        fontWeight: "800",
+        fontSize: 13,
     },
 });

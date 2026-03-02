@@ -9,8 +9,13 @@ export const saveAppointment = async (appointment: any) => {
     await axios.post(`${API_URL}/appointment`, appointment);
 };
 
+export const getAllAppointments = async () => {
+    const res = await axios.get(`${API_URL}/appointment`);
+    return res.data;
+}
+
 export const getAppointments = async () => {
-    const user = await getUser()
+    const user = await getUser();
     const res = await axios.get(`${API_URL}/appointment/${user.id}`);
     return res.data;
 };

@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { authUser } from "@/utils/auth";
+import axios from "axios";
 
 const { width } = Dimensions.get("window");
 
@@ -25,7 +26,7 @@ export default function Login() {
         "doctor",
         "admin",
     ];
-
+    
     const handleLogin = async () => {
         try {
             await authUser({ loginId: email, password }, role);
@@ -38,6 +39,13 @@ export default function Login() {
                 router.push("/(admin)");
             }
         } catch (error) {
+            if(axios.isAxiosError(error)) {
+                if(error?.response?.status === 403) {
+                    router.push("/(doctor)/verifying");
+                } else if(error?.response?.status === 423) {
+                    router.push("/(auth)/suspended");
+                }
+            }
             Alert.alert("Login Failed", "Please check your credentials.");
             console.log(error);
         }

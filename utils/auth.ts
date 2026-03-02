@@ -40,7 +40,6 @@ export const getUser = async () => {
 };
 
 export const authUser = async (login: Login, endpoint: string) => {
-    console.log(login)
     const res = await axios.post(`${API_URL}/${endpoint}/login`, login);
     await AsyncStorage.setItem(USER_KEY, JSON.stringify({token: res.data.password, role: endpoint}));
 }
@@ -81,23 +80,4 @@ export const uploadImage = async (photo: any) => {
  * Finished Doctor register only
  */
 
-
-
-export const identifyUser = async () => {
-    const res = await getUser();
-
-    switch (res?.role) {
-        case "patient":
-            router.push("/(tabs)/home");
-            break;
-        case "doctor":
-            router.push("/(doctor)/(tabs)");
-            break;
-        case "admin":
-            router.push("/(admin)");
-            break;    
-        default:
-            break;
-    }
-}
 

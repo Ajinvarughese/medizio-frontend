@@ -1,10 +1,23 @@
-import React from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Linking } from "react-native";
 import { patientReports } from "@/mock/report";
+import { getDoctorAppointments } from "@/utils/appointments";
+import { useRouter } from "expo-router";
 
 const { width } = Dimensions.get("window");
 
 export default function DoctorReports() {
+    const [patientsWithDoc, setPatientsWithDoc] = useState([]);
+    const router = useRouter();
+
+    const fetchPatients = async () => {
+        const res = await getDoctorAppointments();
+        setPatientsWithDoc(res.filter(item => item.document));
+    }
+    
+    useEffect(() => {
+        fetchPatients();
+    }, []);
     return (
         <ScrollView style={styles.root} contentContainerStyle={{ paddingBottom: 80 }}>
             <View style={styles.bgBlob1} />
@@ -12,20 +25,21 @@ export default function DoctorReports() {
 
             <Text style={styles.header}>Patient Reports 📁</Text>
 
-            {patientReports.map((r) => (
-                <View key={r.id} style={styles.card}>
+            {patientsWithDoc.map((r) => (
+                <View key={r?.id} style={styles.card}>
                     <View style={styles.iconWrap}>
-                        <Text style={styles.icon}>📄</Text>
+                        <Text style={styles.icon}>{r?.patient.name?.charAt(0)}</Text>
                     </View>
 
                     <View style={{ flex: 1 }}>
-                        <Text style={styles.patient}>{r.patient}</Text>
-                        <Text style={styles.reportType}>{r.type}</Text>
+                        <Text style={styles.patient}>{r?.patient.name}</Text>
+                        <Text style={{...styles.reportType, margin: 0}}>{r?.patient.email}</Text>
+                        <Text style={{...styles.reportType, margin: 0}}>{r?.date}</Text>
+                        <Text style={styles.reportType}>{r?.reason}</Text>
 
                         <View style={styles.actionsRow}>
-                            <ActionBtn label="View" />
-                            <ActionBtn label="Download" />
-                            <ActionBtn label="Comment" />
+                            <ActionBtn label="View" onPress={() => router.push(`/(doctor)/(tabs)/appointment?appointmentId=${r.id}`)} />
+                            <ActionBtn label="Download" onPress={() => Linking.openURL(r?.document)} />
                         </View>
                     </View>
                 </View>
@@ -34,8 +48,8 @@ export default function DoctorReports() {
     );
 }
 
-const ActionBtn = ({ label }: { label: string }) => (
-    <TouchableOpacity style={styles.actionBtn}>
+const ActionBtn = ({ label, onPress }) => (
+    <TouchableOpacity style={styles.actionBtn} onPress={onPress}>
         <Text style={styles.actionText}>{label}</Text>
     </TouchableOpacity>
 );
@@ -96,7 +110,9 @@ const styles = StyleSheet.create({
     },
 
     icon: {
-        fontSize: 20,
+        fontSize: 27,
+        fontWeight: 800,
+        color: "#102A43",
     },
 
     patient: {

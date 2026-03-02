@@ -10,15 +10,53 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { icons } from "@/interfaces/constants/icons";
-import { identifyUser } from "@/utils/auth";
+import { getUser } from "@/utils/auth";
+import axios from "axios";
 
 const { width } = Dimensions.get("window");
 
 export default function Index() {
     const router = useRouter();
-
+    
+    const identifyUser = async () => {
+        try {
+            const res = await getUser();
+            switch (res?.role) {
+                case "patient":
+                    router.push("/(tabs)/home");
+                    break;
+                case "doctor":
+                    router.push("/(doctor)/(tabs)");
+                    break;
+                case "admin":
+                    router.push("/(admin)");
+                    break;    
+                default:
+                    break;
+            }
+        } catch(error) {
+            if(axios.isAxiosError(error)) {
+                if(error?.response?.status === 403) {
+                    router.push("/(doctor)/verifying");
+                }else if(error?.response?.status === 423) {
+                    router.push("/(auth)/suspended");
+                }
+            }
+        }
+    }
     useEffect(() => {
-        identifyUser();
+      let isMounted = true;
+
+      const checkUser = async () => {
+        if (!isMounted) return;
+        await identifyUser();
+      };
+
+      checkUser();
+
+      return () => {
+        isMounted = false;
+      };
     }, []);
 
     return (

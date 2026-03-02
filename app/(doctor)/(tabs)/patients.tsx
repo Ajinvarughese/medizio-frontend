@@ -19,7 +19,7 @@ export default function Patients() {
     const router = useRouter();
     const [appointments, setAppointments] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
-
+    
     useEffect(() => {
         loadPastAppointments();
     }, []);

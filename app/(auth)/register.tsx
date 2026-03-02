@@ -83,14 +83,14 @@ export default function Register() {
       let payload: any = {
         email,
         password,
-        dob,
-        location,
       };
 
       if (role === "patient") {
         payload = {
           ...payload,
           name,
+          dob,
+          location,
         };
       }
       
@@ -106,7 +106,9 @@ export default function Register() {
           name,
           experience: Number(experience),
           picture: uploadedImageUrl,
-          specialityId
+          specialityId,
+          dob,
+          location,
         }
       } 
       
@@ -125,7 +127,6 @@ export default function Register() {
       setLoading(false);
     }
   };
-
 
 
   return (
@@ -165,16 +166,20 @@ export default function Register() {
           value={confirmPassword}
           onChange={setConfirmPassword}
         />
-        <Input
-            label="Date of birth"
-            value={dob}
-            onChange={setDob}
-          />
-        <Input
-            label="Location"
-            value={location}
-            onChange={setLocation}
-          />
+        {role != "admin" && (
+          <>
+            <Input
+              label="Date of birth"
+              value={dob}
+              onChange={setDob}
+            />
+          <Input
+              label="Location"
+              value={location}
+              onChange={setLocation}
+            />
+          </>
+        )}
         
         {role === "doctor" && (
           <>
@@ -260,6 +265,8 @@ const Input = ({
       keyboardType={keyboard || "default"}
       style={styles.input}
       value={value}
+      placeholderTextColor={"rgba(16,42,67,0.55)"}
+      placeholder={label === "Date of birth" ? "dd-mm-yyyy" : `Enter your ${label.toLowerCase()}`}
       onChangeText={onChange}
     />
   </>

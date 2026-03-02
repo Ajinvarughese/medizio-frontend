@@ -1,6 +1,9 @@
-import { Tabs } from "expo-router";
+import { Tabs, useRouter } from "expo-router";
 import { Image, Text, View, StyleSheet } from "react-native";
 import { icons } from "@/interfaces/constants/icons";
+import { useEffect } from "react";
+import axios from "axios";
+import { getUser, logout } from "@/utils/auth";
 
 const ACTIVE = "#37d06d";
 const INACTIVE = "rgba(16,42,67,0.45)";
@@ -29,6 +32,33 @@ function TabIcon({ focused, icon, label }: IconProps) {
 }
 
 export default function DoctorTabsLayout() {
+    const router = useRouter();
+
+    const checkUser = async () => {
+      try {
+        const res = await getUser();
+        if (res.role !== "doctor") {
+          await logout();
+          router.push("/(auth)/welcome");
+        }
+      } catch (error) {
+        if (axios.isAxiosError(error)) {
+          if (error?.response?.status === 403) {
+            router.push("/(doctor)/verifying");
+            return;
+          } else if (error?.response?.status === 423) {
+            router.push("/(auth)/suspended");
+            return;
+          }
+        }
+        router.push("/");
+      }
+    };
+
+    useEffect(() => {
+      checkUser();
+    }, []);
+
     return (
         <Tabs
             screenOptions={{

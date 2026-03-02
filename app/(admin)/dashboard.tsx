@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
     View,
     Text,
@@ -13,17 +13,94 @@ import {
 } from "react-native-chart-kit";
 import { doctors } from "@/mock/doctors";
 import { patients } from "@/mock/patients";
+import { getAllPatients } from "@/utils/patients";
+import { fetchAllDoctors } from "@/utils/doctor";
+import { getAllAppointments } from "@/utils/appointments";
+import { isCurrentWeek } from "@/utils/dateTime";
 
 const { width } = Dimensions.get("window");
 
 export default function AdminDashboard() {
+    const [doctors, setDoctors] = useState([]);
+    const [patients, setPatients] = useState([]);
+    const [appointments, setAppointments] = useState([]);
+
+    const load = async () => {
+        const p = await getAllPatients();
+        const d = await fetchAllDoctors();
+        const a = await getAllAppointments();
+        setPatients(p);
+        setDoctors(d);
+        setAppointments(a);
+    }
+
+    useEffect(() => {
+        load();
+    }, []);
+    const monthLabels = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
     const totalDoctors = doctors.length;
     const totalPatients = patients.length;
+    
+    const monthlyPatientData = useMemo(() => {
+      const months = Array(12).fill(0);
 
-    const approved = doctors.filter(d => d.status === "Approved").length;
-    const pending = doctors.filter(d => d.status === "Pending").length;
+      patients.forEach((p) => {
+        if (!p?.createdAt) return;
 
-    const revenue = totalPatients * 500;
+        const date = new Date(p.createdAt);
+        const monthIndex = date.getMonth();
+        months[monthIndex] += 1;
+      });
+
+      return months;
+    }, [patients]);
+
+    const currentMonth = new Date().getMonth();
+    const firstHalf = currentMonth < 6;
+    const chartLabels = firstHalf
+      ? monthLabels.slice(0, 6)
+      : monthLabels.slice(6, 12);
+
+    const chartData = firstHalf
+      ? monthlyPatientData.slice(0, 6)
+      : monthlyPatientData.slice(6, 12);
+
+    const approved = doctors.filter(d => d?.verified).length;
+    const pending = doctors.filter(d => !d?.verified).length;
+
+    const appointmentsThisWeek = appointments.filter(d => isCurrentWeek(d?.date)).length;
+    const totalAppointments = appointments.length;
+
+    const weekLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const weeklyAppointmentData = useMemo(() => {
+      const days = Array(7).fill(0);
+
+      appointments.forEach((a) => {
+        if (!a?.date) return;
+
+        const date = new Date(a.date);
+
+        if (isCurrentWeek(a.date)) {
+          const dayIndex = date.getDay(); // 0 = Sunday
+          days[dayIndex] += 1;
+        }
+      });
+
+      return days;
+    }, [appointments]);
 
     const doctorStatusData = [
         {
@@ -43,75 +120,78 @@ export default function AdminDashboard() {
     ];
 
     return (
-        <ScrollView style={styles.root} contentContainerStyle={{ paddingBottom: 120 }}>
+      <ScrollView
+        style={styles.root}
+        contentContainerStyle={{ paddingBottom: 120 }}
+      >
+        <Text style={styles.title}>Admin Dashboard</Text>
 
-            <Text style={styles.title}>Admin Dashboard</Text>
+        {/* TOP STATS */}
+        <View style={styles.row}>
+          <Card label="Doctors" value={totalDoctors} />
+          <Card label="Patients" value={totalPatients} />
+        </View>
 
-            {/* TOP STATS */}
-            <View style={styles.row}>
-                <Card label="Doctors" value={totalDoctors} />
-                <Card label="Patients" value={totalPatients} />
-            </View>
+        <View style={styles.row}>
+          <Card label="Appointments this week " value={appointmentsThisWeek} />
+          <Card label="Appointments" value={totalAppointments} />
+        </View>
 
-            <View style={styles.row}>
-                <Card label="Revenue" value={`₹ ${revenue}`} />
-                <Card label="Appointments" value="128" />
-            </View>
+        {/* BAR CHART */}
+        <Text style={styles.section}>Monthly Patient Growth</Text>
+        <View style={styles.chartCard}>
+          <BarChart
+            data={{
+              labels: chartLabels,
+              datasets: [{ data: chartData }],
+            }}
+            width={width - 60}
+            height={220}
+            yAxisLabel="" // ✅ REQUIRED
+            yAxisSuffix="" // ✅ REQUIRED
+            chartConfig={chartConfig}
+            style={{ borderRadius: 20 }}
+            showValuesOnTopOfBars
+          />
+        </View>
 
-            {/* BAR CHART */}
-            <Text style={styles.section}>Monthly Patient Growth</Text>
-            <View style={styles.chartCard}>
-                <BarChart
-                    data={{
-                        labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
-                        datasets: [{ data: [20, 45, 28, 80, 60, 43] }],
-                    }}
-                    width={width - 60}
-                    height={220}
-                    yAxisLabel=""        // ✅ REQUIRED
-                    yAxisSuffix=""       // ✅ REQUIRED
-                    chartConfig={chartConfig}
-                    style={{ borderRadius: 20 }}
-                    showValuesOnTopOfBars
-                />
+        {/* LINE CHART WITH GRADIENT */}
+        <Text style={styles.section}>Appointments Trend</Text>
+        <View style={styles.chartCard}>
+          <LineChart
+            data={{
+              labels: weekLabels,
+              datasets: [{ data: weeklyAppointmentData }],
+            }}
+            width={width - 60}
+            height={220}
+            chartConfig={{
+              ...chartConfig,
+              fillShadowGradient: "#37d06d",
+              fillShadowGradientOpacity: 0.4,
+            }}
+            bezier
+            style={{ borderRadius: 20 }}
+          />
+        </View>
 
-            </View>
-
-            {/* LINE CHART WITH GRADIENT */}
-            <Text style={styles.section}>Appointments Trend</Text>
-            <View style={styles.chartCard}>
-                <LineChart
-                    data={{
-                        labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
-                        datasets: [{ data: [12, 25, 18, 30, 22, 40] }],
-                    }}
-                    width={width - 60}
-                    height={220}
-                    chartConfig={{
-                        ...chartConfig,
-                        fillShadowGradient: "#37d06d",
-                        fillShadowGradientOpacity: 0.4,
-                    }}
-                    bezier
-                    style={{ borderRadius: 20 }}
-                />
-            </View>
-
-            {/* PIE CHART */}
-            <Text style={styles.section}>Doctor Status Overview</Text>
-            <View style={styles.chartCard}>
-                <PieChart
-                    data={doctorStatusData}
-                    width={width - 60}
-                    height={220}
-                    chartConfig={chartConfig}
-                    accessor="population"
-                    backgroundColor="transparent"
-                    paddingLeft="15"
-                    absolute
-                />
-            </View>
-        </ScrollView>
+        {/* PIE CHART */}
+        <Text style={styles.section}>Doctor Status Overview</Text>
+        <View style={styles.chartCard}>
+          {doctors.length > 0 && (
+            <PieChart
+              data={doctorStatusData}
+              width={width - 60}
+              height={220}
+              chartConfig={chartConfig}
+              accessor="population"
+              backgroundColor="transparent"
+              paddingLeft="15"
+              absolute
+            />
+          )}
+        </View>
+      </ScrollView>
     );
 }
 

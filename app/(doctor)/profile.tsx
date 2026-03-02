@@ -5,20 +5,36 @@ import { useRouter } from "expo-router";
 import { getUser, logout } from "@/utils/auth";
 import { Image } from "react-native";
 import { getAllPatients } from "@/utils/patients";
+import { getDoctorAppointments } from "@/utils/appointments";
+import API_URL from "@/utils/api";
 
 export default function DoctorSidebar() {
     const router = useRouter();
 
     const [doctor, setDoctor] = useState({});
-    const [patients, setPatients] = useState([]);
+    const [appointments, setAppointments] = useState([]);
 
     useEffect(() => {
         const fetchDetails = async () => {
             setDoctor(await getUser());
-            setPatients(await getAllPatients());
+            setAppointments(await getDoctorAppointments());
         }
         fetchDetails();
     }, []);
+
+    const totalPatientCount = React.useMemo(() => {
+        const uniqueEmails = new Set(
+            appointments
+                ?.map(a => a?.patient?.email)
+                ?.filter(Boolean) 
+        );
+
+        return uniqueEmails.size;
+    }, [appointments]);
+
+    const replaceUrl = (url : string ="") => {
+        return url?.replace("http://localhost:8080/api", API_URL )                                           
+    }
 
     return (
         <ScrollView
@@ -29,13 +45,12 @@ export default function DoctorSidebar() {
             {/* PROFILE HEADER */}
             <View style={styles.headerCard}>
                 <View style={styles.avatar}>
-                    {console.log(doctor)}
-                    <Image source={doctor?.picture} resizeMode="cover" style={styles.avatar} />
+                    <Image source={{uri: replaceUrl(doctor?.picture)}} resizeMode="cover" style={styles.avatar} />
                 </View>
 
                 <View style={{ flex: 1 }}>
-                    <Text style={styles.name}>Dr. {doctor.name}</Text>
-                    <Text style={styles.special}>{doctor.specialization}</Text>
+                    <Text style={styles.name}>Dr. {doctor?.name}</Text>
+                    <Text style={styles.special}>{doctor?.specialization}</Text>
 
                     <View style={styles.statusRow}>
                         <View style={styles.statusDot} />
@@ -46,9 +61,9 @@ export default function DoctorSidebar() {
 
             {/* QUICK STATS */}
             <View style={styles.statsRow}>
-                <Stat label="Patients" value={patients?.length} />
-                <Stat label="Rating" value="4.9 ⭐" />
-                <Stat label="Reports" value="12" />
+                <Stat label="Patients" value={totalPatientCount} />
+                <Stat label="Rating" value={`${doctor?.rating} ⭐`} />
+                <Stat label="Appointments" value={appointments?.length} />
             </View>
 
             {/* MAIN SECTION */}

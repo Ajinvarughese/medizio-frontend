@@ -72,3 +72,21 @@ export const calculateAge = (dob: string): number => {
 
   return age;
 };
+
+
+export const isCurrentWeek = (dateString: string) => {
+  const today = new Date();
+  const appointmentDate = new Date(dateString);
+
+  // Get start of week (Sunday)
+  const startOfWeek = new Date(today);
+  startOfWeek.setDate(today.getDate() - today.getDay());
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  // Get end of week (Saturday)
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 6);
+  endOfWeek.setHours(23, 59, 59, 999);
+
+  return appointmentDate >= startOfWeek && appointmentDate <= endOfWeek;
+};

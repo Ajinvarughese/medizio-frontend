@@ -15,7 +15,7 @@ import { Swipeable } from "react-native-gesture-handler";
 
 import { getUser } from "@/utils/auth";
 import { fetchDoctorAppointments } from "@/mock/doctorAppointments";
-import { dateClassify } from "@/utils/dateTime";
+import { dateClassify, isCurrentWeek } from "@/utils/dateTime";
 import { appointments } from "@/mock/appointments";
 
 const { width } = Dimensions.get("window");
@@ -23,25 +23,30 @@ const { width } = Dimensions.get("window");
 export default function DoctorHome() {
     const [doctor, setDoctor] = useState({});
     const [doctorAppointments, setDoctorAppointments] = useState([]);
-    
+    const [upcomingOnly, setUpcomingOnly] = useState([]);
+
     const fetchDoctor = async () => {
         setDoctor(await getUser());
     }
 
-    const fetchAppointments =async () => {
+    const fetchAppointments = async () => {
         const res = await fetchDoctorAppointments();
-        setDoctorAppointments(res.filter((item) => item.status === "BOOKED"));
+        setDoctorAppointments(res);
+        setUpcomingOnly(res.filter((item) => item.status === "BOOKED"));
+    
     }
     
     useEffect(() => {
         fetchDoctor();
         fetchAppointments();
     }, []);
-    console.log(doctor)
+    
     const router = useRouter();
     const pulse = useRef(new Animated.Value(1)).current;
 
     const todayAppointments = doctorAppointments.filter(a => dateClassify(a?.date) === "Today");
+    const totalUpcomingAppointments = doctorAppointments.filter(a => a.status === "BOOKED" && dateClassify(a?.date) !== "Today");
+    const totalPatientsThisWeek = doctorAppointments.filter(a => a.status === "RESOLVED" && isCurrentWeek(a?.updatedAt));
     
     useEffect(() => {
         Animated.loop(
@@ -82,13 +87,13 @@ export default function DoctorHome() {
 
             {/* SUMMARY */}
             <View style={styles.summaryRow}>
-                <SummaryCard label="Today’s Patients" value={todayAppointments.length} color="#22c55e" />
-                <SummaryCard label="Pending Reports" value="6" color="#f59e0b" />
+                <SummaryCard label="Today’s Appointments" value={todayAppointments.length} color="#22c55e" />
+                <SummaryCard label="Upcoming Appointments" value={totalUpcomingAppointments.length} color="#f59e0b" />
             </View>
 
             {/* UPCOMING APPOINTMENTS CAROUSEL */}
             <Text style={styles.sectionTitle}>Upcoming Appointments</Text>
-            {doctorAppointments.length <= 0 && (
+            {upcomingOnly.length <= 0 && (
                 <View style={styles.emptyCard}>
                     <View style={styles.emptyIconWrapper}>
                         <Text style={styles.emptyIcon}>📅</Text>
@@ -108,7 +113,7 @@ export default function DoctorHome() {
                 snapToAlignment="start"
 
             >
-                {doctorAppointments.slice(0, 5).map(item => (
+                {upcomingOnly.slice(0, 5).map(item => (
                     <Swipeable
                         key={item?.id}
                         renderRightActions={() => (
@@ -133,17 +138,17 @@ export default function DoctorHome() {
             
 
             {/* WEEK STATS */}
-            <Text style={styles.sectionTitle}>This Week</Text>
+            <Text style={styles.sectionTitle}>Your Stats</Text>
             <View style={styles.statsRow}>
-                <Stat label="Patients" value="42" />
-                <Stat label="Rating" value="4.8 ⭐" />
-                <Stat label="Reports" value="18" />
+                <Stat label="Patients this week" value={totalPatientsThisWeek.length} />
+                <Stat label="Rating" value={doctor?.rating} />
+                <Stat label="Total Appointments" value={appointments?.length} />
             </View>
 
             {/* ALERTS */}
             <Text style={styles.sectionTitle}>Alerts</Text>
             <View style={styles.alertCard}>
-                <Text style={styles.alertText}>🔔 2 patients uploaded new lab reports</Text>
+                <Text style={styles.alertText}>🔔 2 patients asked for lab reports</Text>
             </View>
         </ScrollView>
     );
