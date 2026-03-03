@@ -9,6 +9,7 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { saveUser, uploadImage } from "@/utils/auth";
@@ -17,6 +18,7 @@ import { useRouter } from "expo-router";
 import API_URL from "@/utils/api";
 import { Picker } from "@react-native-picker/picker";
 import { getDoctorSpeciality } from "@/utils/doctor";
+import { generateOtp, sendOtp, validateOtp } from "@/utils/otpApi";
 
 type Role = "patient" | "doctor" | "admin";
 
@@ -25,6 +27,8 @@ export default function Register() {
   const [role, setRole] = useState<Role>("patient");
   const [loading, setLoading] = useState(false);
   const [photo, setPhoto] = useState<any>(null);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState<string>("");
 
   // Common fields
   const [name, setName] = useState("");
@@ -63,8 +67,8 @@ export default function Register() {
     }
   };
 
-
-  const handleRegister = async () => {
+  const handleSendOtp = async () => {
+    setLoading(true);
     if (!email || !password) {
       return Alert.alert("Error", "Email and password are required.");
     }
@@ -77,42 +81,63 @@ export default function Register() {
       return Alert.alert("Error", "Password must be at least 6 characters long.");
     }
 
-    try {
-      setLoading(true);
-      // 🔥 STEP 2: Send register payload
-      let payload: any = {
-        email,
-        password,
-      };
-
-      if (role === "patient") {
-        payload = {
-          ...payload,
-          name,
-          dob,
-          location,
-        };
+    if (role === "doctor") {
+      if (!specialityId) {
+        return Alert.alert("Error", "Please select a speciality.");
       }
+    } 
       
+    const payload = {
+      email,
+      userType: role.toUpperCase(),
+    }
+    const otp = await generateOtp(payload);
+    await sendOtp(otp.otp, otp.email);
+    setOtpSent(true);
+    setLoading(false);
+  };
 
-      if (role === "doctor") {
-        const uploadedImageUrl = await uploadImage(photo);
-        if (!specialityId) {
-          return Alert.alert("Error", "Please select a speciality.");
-        }
+  const handleRegister = async () => {
+    setLoading(true);
+    // 🔥 STEP 2: Send register payload
+    let payload: any = {
+      email,
+      password,
+    };
 
-        payload = {
-          ...payload,
-          name,
-          experience: Number(experience),
-          picture: uploadedImageUrl,
-          specialityId,
-          dob,
-          location,
-        }
-      } 
-      
+    if (role === "patient") {
+      payload = {
+        ...payload,
+        name,
+        dob,
+        location,
+      };
+    }
 
+    if (role === "doctor") {
+      const uploadedImageUrl = await uploadImage(photo);
+      if (!specialityId) {
+        return Alert.alert("Error", "Please select a speciality.");
+      }
+
+      payload = {
+        ...payload,
+        name,
+        experience: Number(experience),
+        picture: uploadedImageUrl,
+        specialityId,
+        dob,
+        location,
+      };
+    }
+    const otpData = {
+      email,
+      otp,
+      userType: role.toUpperCase(),
+    };
+
+    try {
+      await validateOtp(otpData);      
       await saveUser(payload, role);
 
       Alert.alert("Success", `${role} registered successfully!`);
@@ -121,8 +146,15 @@ export default function Register() {
       else if (role === "doctor") router.push("/(doctor)/(tabs)");
       else router.push("/(admin)");
     } catch (error) {
-      const err = error as AxiosError;
-      Alert.alert("Error", err.response?.data as string || err.message);
+      if(axios.isAxiosError(error)) {
+        if(error?.response?.status === 401) {
+          if(Platform.OS === "web") {
+            alert("Incorrect OTP entered.");
+          }else {
+            Alert.alert("Incorrect OTP", "OTP entered is incorrect.");
+          }
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -142,100 +174,110 @@ export default function Register() {
               style={[styles.roleBtn, role === r && styles.roleActive]}
               onPress={() => setRole(r as Role)}
             >
-              <Text
-                style={[
-                  styles.roleText,
-                  role === r && { color: "#fff" },
-                ]}
-              >
+              <Text style={[styles.roleText, role === r && { color: "#fff" }]}>
                 {r.toUpperCase()}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {role !== "admin" && (
-          <Input label="Full Name" value={name} onChange={setName} />
-        )}
-
-        <Input label="Email Address" value={email} onChange={setEmail} />
-        <Input label="Password" secure value={password} onChange={setPassword} />
-        <Input
-          label="Confirm Password"
-          secure
-          value={confirmPassword}
-          onChange={setConfirmPassword}
-        />
-        {role != "admin" && (
+        {otpSent ? (
           <>
-            <Input
-              label="Date of birth"
-              value={dob}
-              onChange={setDob}
-            />
-          <Input
-              label="Location"
-              value={location}
-              onChange={setLocation}
-            />
+            <Input label="Email address" value={email} disabled />
+            <Input label="OTP" value={otp} onChange={setOtp} />
           </>
-        )}
-        
-        {role === "doctor" && (
+        ) : (
           <>
-           <Text style={styles.label}>Specialization</Text>
+            {role !== "admin" && (
+              <Input label="Full Name" value={name} onChange={setName} />
+            )}
 
-            <View style={styles.dropdownWrapper}>
-              <Picker
-                selectedValue={specialityId}
-                onValueChange={(itemValue) => setSpecialityId(itemValue)}
-                style={styles.picker}
-                dropdownIconColor="#102A43"
-              >
-                <Picker.Item label="Select Speciality" value={null} />
-                {specialities.map((s) => (
-                  <Picker.Item key={s.id} label={s.name} value={s.id} />
-                ))}
-              </Picker>
-            </View>
+            <Input label="Email Address" value={email} onChange={setEmail} />
             <Input
-              label="Experience (Years)"
-              keyboard="numeric"
-              value={experience}
-              onChange={setExperience}
+              label="Password"
+              secure
+              value={password}
+              onChange={setPassword}
             />
-            
-            <Text style={styles.label}>Profile Photo</Text>
-            <TouchableOpacity style={styles.photoBox} onPress={pickImage}>
-              {photo ? (
-                <Image
-                  source={{ uri: photo.uri }}
-                  style={styles.photo}
-                  resizeMode="cover"
+            <Input
+              label="Confirm Password"
+              secure
+              value={confirmPassword}
+              onChange={setConfirmPassword}
+            />
+            {role != "admin" && (
+              <>
+                <Input label="Date of birth" value={dob} onChange={setDob} />
+                <Input
+                  label="Location"
+                  value={location}
+                  onChange={setLocation}
                 />
-              ) : (
-                <Text style={styles.photoPlaceholder}>Tap to Upload</Text>
-              )}
-            </TouchableOpacity>
+              </>
+            )}
 
+            {role === "doctor" && (
+              <>
+                <Text style={styles.label}>Specialization</Text>
+
+                <View style={styles.dropdownWrapper}>
+                  <Picker
+                    selectedValue={specialityId}
+                    onValueChange={(itemValue) => setSpecialityId(itemValue)}
+                    style={styles.picker}
+                    dropdownIconColor="#102A43"
+                  >
+                    <Picker.Item label="Select Speciality" value={null} />
+                    {specialities.map((s) => (
+                      <Picker.Item key={s.id} label={s.name} value={s.id} />
+                    ))}
+                  </Picker>
+                </View>
+                <Input
+                  label="Experience (Years)"
+                  keyboard="numeric"
+                  value={experience}
+                  onChange={setExperience}
+                />
+
+                <Text style={styles.label}>Profile Photo</Text>
+                <TouchableOpacity style={styles.photoBox} onPress={pickImage}>
+                  {photo ? (
+                    <Image
+                      source={{ uri: photo.uri }}
+                      style={styles.photo}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <Text style={styles.photoPlaceholder}>Tap to Upload</Text>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
           </>
         )}
 
-        <TouchableOpacity onPress={handleRegister} style={styles.primaryBtn}>
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.primaryText}>Register</Text>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-              onPress={() => router.push("/(auth)/login")}
-          >
-              <Text style={styles.link}>
-                  Already have an account? Login
-              </Text>
+        {!otpSent ? (
+          <TouchableOpacity onPress={handleSendOtp} style={styles.primaryBtn}>
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.primaryText}>Send OTP</Text>
+            )}
           </TouchableOpacity>
+        ) : (
+          <TouchableOpacity onPress={handleRegister} style={styles.primaryBtn}>
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.primaryText}>Register</Text>
+            )}
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity onPress={() => router.push("/(auth)/login")}>
+          <Text style={styles.link}>Already have an account? Login</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -248,7 +290,8 @@ interface InputProps {
   secure?: boolean;
   keyboard?: any;
   value: string;
-  onChange: (text: string) => void;
+  onChange?: (text: string) => void;
+  disabled?: boolean;
 }
 
 const Input = ({
@@ -257,10 +300,12 @@ const Input = ({
   keyboard,
   value,
   onChange,
+  disabled = false,
 }: InputProps) => (
   <>
     <Text style={styles.label}>{label}</Text>
     <TextInput
+      aria-disabled={disabled}
       secureTextEntry={secure}
       keyboardType={keyboard || "default"}
       style={styles.input}

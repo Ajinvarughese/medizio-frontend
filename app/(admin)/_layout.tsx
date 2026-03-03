@@ -66,15 +66,6 @@ export default function DoctorTabsLayout() {
             />
 
             <Tabs.Screen
-                name="feedback"
-                options={{
-                    tabBarIcon: ({ focused }) => (
-                        <TabIcon focused={focused} icon={icons.chat} label="feedback" />
-                    ),
-                }}
-            />
-
-            <Tabs.Screen
                 name="dashboard"
                 options={{
                     tabBarIcon: ({ focused }) => (

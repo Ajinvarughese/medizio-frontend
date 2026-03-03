@@ -1,279 +1,534 @@
-import React, { useEffect, useRef, useState } from "react";
+import { getUser } from "@/utils/auth";
+import { useEffect, useRef, useState } from "react";
 import {
-    View,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    StyleSheet,
-    FlatList,
-    KeyboardAvoidingView,
-    Platform,
-    ActivityIndicator,
-    Animated,
+  View,
+  TextInput,
+  TouchableOpacity,
+  FlatList,
+  StyleSheet,
+  Animated,
+  Platform,
+  Image,
+  Text,
 } from "react-native";
+import Markdown from "react-native-markdown-display";
+import * as DocumentPicker from "expo-document-picker";
 
-import { askGPT } from "@/utils/gpt";
+import {
+  deleteChatLog,
+  generateAiResponse,
+  getChatLog,
+} from "@/utils/aiChatApi";
+import { Alert } from "react-native";
+import Delete from "../assets/icons/delete.png";
+import Logo from "../assets/icons/logo.png";
 
-type Msg = {
-    id: string;
-    role: "user" | "assistant";
-    text: string;
+export type Message = {
+  id?: number;
+  text: string;
+  textFrom: "USER" | "ASSISTANT";
+  userId: number;
+};
+
+/* ---------------- CLEAN TEXT ---------------- */
+
+const cleanAIText = (text: string) => {
+  if (!text) return "";
+
+  return text
+    .replace(/^"|"$/g, "")
+    .replace(/\\n/g, "\n")
+    .replace(/\\"/g, '"')
+    .trim();
 };
 
 export default function AIChat() {
-    const [messages, setMessages] = useState<Msg[]>([
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+  const flatListRef = useRef<FlatList>(null);
+  const [file, setFile] = useState<any>(null);
+
+  const dotAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  }, [messages]);
+
+  const pickDocument = async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: "application/pdf",
+      copyToCacheDirectory: true,
+    });
+
+    if (result.canceled) return;
+
+    const doc = result.assets[0];
+
+    setFile({
+      uri: doc.uri,
+      name: doc.name,
+      type: "application/pdf",
+    });
+  };
+
+  /* ---------------- DELETE CHAT ---------------- */
+
+  const handleDeleteChat = () => {
+    if (Platform.OS === "web") {
+      const confirmed = window.confirm(
+        "This will permanently delete your chat history."
+      );
+
+      if (confirmed) {
+        deleteChatLog();
+        setMessages([]);
+      }
+      return;
+    }
+
+    Alert.alert(
+      "Clear chat?",
+      "This will permanently delete your chat history.",
+      [
+        { text: "Cancel", style: "cancel" },
         {
-            id: "1",
-            role: "assistant",
-            text:
-                "Hi 👋 I'm your AI Medical Assistant. Tell me your symptoms or upload reports and I can guide you.",
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            await deleteChatLog();
+            setMessages([]);
+          },
         },
-    ]);
-
-    const [input, setInput] = useState("");
-    const [loading, setLoading] = useState(false);
-
-    const listRef = useRef<FlatList>(null);
-
-    // typing animation dots
-    const dot1 = useRef(new Animated.Value(0.2)).current;
-    const dot2 = useRef(new Animated.Value(0.2)).current;
-    const dot3 = useRef(new Animated.Value(0.2)).current;
-
-    useEffect(() => {
-        if (!loading) return;
-
-        const anim = Animated.loop(
-            Animated.sequence([
-                Animated.timing(dot1, { toValue: 1, duration: 250, useNativeDriver: true }),
-                Animated.timing(dot2, { toValue: 1, duration: 250, useNativeDriver: true }),
-                Animated.timing(dot3, { toValue: 1, duration: 250, useNativeDriver: true }),
-                Animated.timing(dot1, { toValue: 0.2, duration: 250, useNativeDriver: true }),
-                Animated.timing(dot2, { toValue: 0.2, duration: 250, useNativeDriver: true }),
-                Animated.timing(dot3, { toValue: 0.2, duration: 250, useNativeDriver: true }),
-            ])
-        );
-
-        anim.start();
-        return () => anim.stop();
-    }, [loading]);
-
-    const scrollToBottom = () => {
-        setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 200);
-    };
-
-    useEffect(() => {
-        scrollToBottom();
-    }, [messages, loading]);
-
-    const sendMessage = async () => {
-        if (!input.trim() || loading) return;
-
-        const userText = input.trim();
-        setInput("");
-
-        const userMsg: Msg = {
-            id: Date.now().toString(),
-            role: "user",
-            text: userText,
-        };
-
-        setMessages((prev) => [...prev, userMsg]);
-        setLoading(true);
-
-        try {
-            const reply = await askGPT(userText);
-
-            const botMsg: Msg = {
-                id: (Date.now() + 1).toString(),
-                role: "assistant",
-                text: reply,
-            };
-
-            setMessages((prev) => [...prev, botMsg]);
-        } catch (err: any) {
-            setMessages((prev) => [
-                ...prev,
-                {
-                    id: (Date.now() + 2).toString(),
-                    role: "assistant",
-                    text: "⚠️ Unable to connect to AI. Please try again later.",
-                },
-            ]);
-        }
-
-        setLoading(false);
-    };
-
-    const renderMsg = ({ item }: { item: Msg }) => {
-        const isUser = item.role === "user";
-
-        return (
-            <View
-                style={[
-                    styles.bubble,
-                    isUser ? styles.userBubble : styles.aiBubble,
-                    { alignSelf: isUser ? "flex-end" : "flex-start" },
-                ]}
-            >
-                <Text style={[styles.msgText, isUser ? styles.userText : styles.aiText]}>
-                    {item.text}
-                </Text>
-            </View>
-        );
-    };
-
-    return (
-        <KeyboardAvoidingView
-            style={{ flex: 1 }}
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
-            <View style={styles.root}>
-                <FlatList
-                    ref={listRef}
-                    data={messages}
-                    keyExtractor={(item) => item.id}
-                    renderItem={renderMsg}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={{ paddingBottom: 120 }}
-                />
-
-                {/* Typing Animation */}
-                {loading && (
-                    <View style={styles.typingBox}>
-                        <Text style={styles.typingText}>AI is typing</Text>
-
-                        <View style={styles.dotsRow}>
-                            <Animated.View style={[styles.dot, { opacity: dot1 }]} />
-                            <Animated.View style={[styles.dot, { opacity: dot2 }]} />
-                            <Animated.View style={[styles.dot, { opacity: dot3 }]} />
-                        </View>
-                    </View>
-                )}
-
-                {/* Input */}
-                <View style={styles.inputWrap}>
-                    <TextInput
-                        value={input}
-                        onChangeText={setInput}
-                        placeholder="Ask AI about symptoms..."
-                        placeholderTextColor="#7f9f94"
-                        style={styles.input}
-                    />
-
-                    <TouchableOpacity style={styles.sendBtn} onPress={sendMessage}>
-                        {loading ? (
-                            <ActivityIndicator color="#061014" />
-                        ) : (
-                            <Text style={styles.sendText}>➤</Text>
-                        )}
-                    </TouchableOpacity>
-                </View>
-            </View>
-        </KeyboardAvoidingView>
+      ]
     );
+  };
+
+  /* ---------------- LOAD CHAT HISTORY ---------------- */
+
+  const handleChatLog = async () => {
+    const logs = await getChatLog();
+
+    if (!logs) return;
+
+    const cleaned = logs.map((m: Message) => ({
+      ...m,
+      text: cleanAIText(m.text),
+    }));
+
+    setMessages(cleaned);
+  };
+
+  useEffect(() => {
+    handleChatLog();
+  }, []);
+
+  /* ---------------- TYPING DOTS ANIMATION ---------------- */
+
+  useEffect(() => {
+    if (!isTyping) return;
+
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(dotAnim, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(dotAnim, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    loop.start();
+
+    return () => loop.stop();
+  }, [isTyping]);
+
+  /* ---------------- SEND MESSAGE ---------------- */
+
+  const sendMessage = async () => {
+    if (!input.trim() || isTyping) return;
+
+    const user = await getUser();
+
+    const userMsg: Message = {
+      id: Date.now(),
+      text: input,
+      textFrom: "USER",
+      userId: user!.id,
+    };
+
+    setMessages((prev) => [...prev, userMsg]);
+    setInput("");
+    setIsTyping(true);
+
+    try {
+      const res = await generateAiResponse(userMsg.text, file);
+
+      const aiMsg: Message = {
+        id: Date.now() + 1,
+        text: cleanAIText(res.text),
+        textFrom: "ASSISTANT",
+        userId: userMsg.userId,
+      };
+
+      setMessages((prev) => [...prev, aiMsg]);
+
+      setFile(null); 
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  /* ---------------- UI ---------------- */
+
+  return (
+    <View style={styles.wrapper}>
+      {/* HEADER */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <Image source={Logo} style={styles.aiIcon} />
+          <Text style={styles.aiName}>Medizio AI</Text>
+        </View>
+
+        <TouchableOpacity onPress={handleDeleteChat} style={styles.deleteBtn}>
+          <View style={styles.deleteRow}>
+            <Image source={Delete} style={styles.deleteIcon} />
+            <Text style={styles.deleteText}>Delete Chat</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+
+      {/* CHAT LIST */}
+
+      {messages.length === 0 ? (
+        <EmptyChat onSuggestion={(text) => setInput(text)} />
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(item, index) =>
+            item.id?.toString() ?? index.toString()
+          }
+          renderItem={({ item }) => (
+            <View
+              style={[
+                styles.bubble,
+                item.textFrom === "USER" ? styles.userBubble : styles.aiBubble,
+              ]}
+            >
+              <Markdown
+                style={{
+                  body:
+                    item.textFrom === "USER" ? styles.userText : styles.aiText,
+                  strong: { fontWeight: "700" },
+                  bullet_list: { marginVertical: 6 },
+                  paragraph: { marginBottom: 6 },
+                }}
+              >
+                {cleanAIText(item.text)}
+              </Markdown>
+            </View>
+          )}
+          onContentSizeChange={() =>
+            flatListRef.current?.scrollToEnd({ animated: true })
+          }
+          ListFooterComponent={
+            isTyping ? (
+              <View style={[styles.bubble, styles.aiBubble]}>
+                <TypingDots anim={dotAnim} />
+              </View>
+            ) : null
+          }
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 14 }}
+        />
+      )}
+
+      {/* INPUT */}
+      {file && (
+        <View style={styles.filePreview}>
+          <Text style={{ color: "#fff" }}>📄 {file.name}</Text>
+          <TouchableOpacity onPress={() => setFile(null)}>
+            <Image source={Delete} style={styles.deleteIcon} />
+          </TouchableOpacity>
+        </View>
+      )}
+      <View style={styles.inputBox}>
+        <TouchableOpacity onPress={pickDocument} style={styles.attachBtn}>
+          <Text style={{ fontSize: 18 }}>📎</Text>
+        </TouchableOpacity>
+
+        <TextInput
+          value={input}
+          onChangeText={setInput}
+          placeholder="Ask about your health..."
+          placeholderTextColor="#9aa8a6"
+          style={styles.input}
+          multiline
+        />
+
+        <TouchableOpacity
+          style={[styles.sendBtn, isTyping && { opacity: 0.6 }]}
+          onPress={sendMessage}
+          disabled={isTyping}
+        >
+          <Text style={styles.sendText}>➤</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+function EmptyChat({ onSuggestion }: { onSuggestion: (text: string) => void }) {
+  const suggestions = [
+    "Explain my blood test results",
+    "What are symptoms of diabetes?",
+    "How can I improve my heart health?",
+    "What does high glucose mean?",
+  ];
+
+  return (
+    <View style={styles.emptyContainer}>
+      <Image source={Logo} style={styles.emptyLogo} />
+
+      <Text style={styles.emptyTitle}>Medizio AI</Text>
+      <Text style={styles.emptySubtitle}>
+        Ask me about your health, lab reports, or symptoms.
+      </Text>
+
+      <View style={styles.suggestionWrap}>
+        {suggestions.map((s, i) => (
+          <TouchableOpacity
+            key={i}
+            style={styles.suggestionChip}
+            onPress={() => onSuggestion(s)}
+          >
+            <Text style={styles.suggestionText}>{s}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+/* ---------------- TYPING DOTS ---------------- */
+
+function TypingDots({ anim }: { anim: Animated.Value }) {
+  const opacity = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 1],
+  });
+
+  return (
+    <Animated.Text style={[styles.typingText, { opacity }]}>
+      ● ● ●
+    </Animated.Text>
+  );
 }
 
 /* ---------------- STYLES ---------------- */
 
 const styles = StyleSheet.create({
-    root: {
-        flex: 1,
-        marginTop: 10,
-    },
+  emptyContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 40,
+  },
 
-    bubble: {
-        maxWidth: "82%",
-        padding: 14,
-        borderRadius: 16,
-        marginBottom: 10,
-    },
+  emptyLogo: {
+    width: 70,
+    height: 70,
+    resizeMode: "contain",
+    marginBottom: 14,
+    opacity: 0.9,
+  },
 
-    userBubble: {
-        backgroundColor: "#00d48a",
-        borderTopRightRadius: 6,
-    },
-    aiBubble: {
-        backgroundColor: "rgba(255,255,255,0.06)",
-        borderTopLeftRadius: 6,
-        borderWidth: 1,
-        borderColor: "rgba(255,255,255,0.05)",
-    },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#eafff6",
+  },
 
-    msgText: {
-        fontSize: 14,
-        lineHeight: 20,
-        fontWeight: "700",
-    },
-    userText: {
-        color: "#061014",
-    },
-    aiText: {
-        color: "#e5fff6",
-    },
+  emptySubtitle: {
+    marginTop: 6,
+    fontSize: 13,
+    color: "rgba(255,255,255,0.6)",
+    textAlign: "center",
+    maxWidth: 260,
+  },
 
-    typingBox: {
-        alignSelf: "flex-start",
-        backgroundColor: "rgba(255,255,255,0.06)",
-        borderRadius: 16,
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-        marginBottom: 10,
-        borderWidth: 1,
-        borderColor: "rgba(255,255,255,0.05)",
-    },
-    typingText: {
-        color: "#cfe3dc",
-        fontWeight: "800",
-        fontSize: 12,
-        marginBottom: 6,
-    },
+  suggestionWrap: {
+    marginTop: 22,
+    width: "100%",
+    gap: 10,
+  },
 
-    dotsRow: { flexDirection: "row", gap: 6 },
-    dot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: "#00d48a",
-    },
+  suggestionChip: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
 
-    inputWrap: {
-        position: "absolute",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        backgroundColor: "#071013",
-        borderTopWidth: 1,
-        borderTopColor: "rgba(255,255,255,0.05)",
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 10,
-    },
+  suggestionText: {
+    color: "#eafff6",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  wrapper: {
+    flex: 1,
+    backgroundColor: "#1f1f1f",
+    padding: 12,
+  },
 
-    input: {
-        flex: 1,
-        backgroundColor: "rgba(255,255,255,0.05)",
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        borderRadius: 14,
-        color: "#fff",
-        fontWeight: "700",
-    },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 12,
+    padding: 10,
+  },
 
-    sendBtn: {
-        width: 46,
-        height: 46,
-        borderRadius: 14,
-        backgroundColor: "#00d48a",
-        alignItems: "center",
-        justifyContent: "center",
-    },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
 
-    sendText: {
-        fontSize: 18,
-        fontWeight: "900",
-        color: "#061014",
-    },
+  aiIcon: {
+    width: 28,
+    height: 28,
+    resizeMode: "contain",
+  },
+
+  aiName: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#e6fff6",
+  },
+
+  deleteBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,0,0,0.22)",
+  },
+
+  deleteRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  deleteIcon: {
+    width: 16,
+    height: 16,
+  },
+
+  deleteText: {
+    fontSize: 14,
+    color: "#fff",
+    fontWeight: "600",
+  },
+
+  bubble: {
+    maxWidth: "82%",
+    padding: 14,
+    borderRadius: 18,
+    marginBottom: 10,
+  },
+
+  aiBubble: {
+    backgroundColor: "rgba(0,212,138,0.28)",
+    alignSelf: "flex-start",
+    borderTopLeftRadius: 6,
+  },
+
+  userBubble: {
+    backgroundColor: "rgba(255,255,255,0.14)",
+    alignSelf: "flex-end",
+    borderTopRightRadius: 6,
+  },
+
+  aiText: {
+    color: "#eafff6",
+    fontSize: 15,
+    lineHeight: 22,
+  },
+
+  userText: {
+    color: "#ffffff",
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: "600",
+  },
+
+  typingText: {
+    color: "#d5efe6",
+    fontSize: 18,
+    letterSpacing: 3,
+  },
+
+  inputBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.1)",
+    padding: 10,
+    borderRadius: 18,
+    marginTop: 8,
+  },
+
+  input: {
+    flex: 1,
+    color: "#fff",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 15,
+    minHeight: 34,
+  },
+
+  sendBtn: {
+    backgroundColor: "#00d48a",
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 16,
+    marginLeft: 8,
+    minWidth: 52,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  sendText: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#04211b",
+  },
+  attachBtn: {
+    paddingHorizontal: 8,
+    justifyContent: "center",
+  },
+
+  filePreview: {
+    padding: 8,
+    height: 50,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 8,
+  },
 });

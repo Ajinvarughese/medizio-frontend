@@ -12,7 +12,6 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { icons } from "@/interfaces/constants/icons";
-import AIChat from "@/components/AIChat";
 import { getUser } from "@/utils/auth";
 import axios from "axios";
 
@@ -228,11 +227,7 @@ export default function Index() {
                                 <Text style={styles.closeText}>✕</Text>
                             </TouchableOpacity>
                         </View>
-
-                        {/* Chat */}
-                        <View style={{ flex: 1 }}>
-                            <AIChat />
-                        </View>
+                        
                     </View>
                 </View>
             </Modal>
