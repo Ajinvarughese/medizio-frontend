@@ -2,7 +2,7 @@ import { Platform } from "react-native";
 
 const fetchUrl = () : string => {
     if(Platform.OS === 'web') return 'http://localhost:8080/api'
-    else return 'http://172.20.10.2:8080/api'
+    else return "http://10.70.161.237:8080/api";
 } 
 
 const API_URL = fetchUrl();

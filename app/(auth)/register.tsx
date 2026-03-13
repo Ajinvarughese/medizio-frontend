@@ -13,9 +13,8 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { saveUser, uploadImage } from "@/utils/auth";
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 import { useRouter } from "expo-router";
-import API_URL from "@/utils/api";
 import { Picker } from "@react-native-picker/picker";
 import { getDoctorSpeciality } from "@/utils/doctor";
 import { generateOtp, sendOtp, validateOtp } from "@/utils/otpApi";
@@ -91,8 +90,7 @@ export default function Register() {
       email,
       userType: role.toUpperCase(),
     }
-    const otp = await generateOtp(payload);
-    await sendOtp(otp.otp, otp.email);
+    await generateOtp(payload);
     setOtpSent(true);
     setLoading(false);
   };
@@ -183,7 +181,7 @@ export default function Register() {
 
         {otpSent ? (
           <>
-            <Input label="Email address" value={email} disabled />
+            <Input label="Email address" value={email} editable />
             <Input label="OTP" value={otp} onChange={setOtp} />
           </>
         ) : (
@@ -291,7 +289,7 @@ interface InputProps {
   keyboard?: any;
   value: string;
   onChange?: (text: string) => void;
-  disabled?: boolean;
+  editable?: boolean;
 }
 
 const Input = ({
@@ -300,12 +298,12 @@ const Input = ({
   keyboard,
   value,
   onChange,
-  disabled = false,
+  editable = true,
 }: InputProps) => (
   <>
     <Text style={styles.label}>{label}</Text>
     <TextInput
-      aria-disabled={disabled}
+      editable={editable}
       secureTextEntry={secure}
       keyboardType={keyboard || "default"}
       style={styles.input}

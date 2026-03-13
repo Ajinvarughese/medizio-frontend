@@ -75,9 +75,5 @@ export const uploadImage = async (photo: any) => {
   return res.data[0];
 };
 
-/**
-    Recently done: 
- * Finished Doctor register only
- */
 
 
