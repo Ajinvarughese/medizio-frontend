@@ -180,7 +180,7 @@ export default function AIChat() {
 
       setMessages((prev) => [...prev, aiMsg]);
 
-      setFile(null); 
+      setFile(null);
     } finally {
       setIsTyping(false);
     }
@@ -390,6 +390,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#1f1f1f",
     padding: 12,
+    marginBottom: 80,
   },
 
   header: {
