@@ -34,7 +34,7 @@ export const extractFromFile = async (file: any, disease: string) => {
     const formData = new FormData();
 
     if (Platform.OS === "web") {
-      formData.append("file", file.file);
+      formData.append("file", file);
     } else {
       formData.append("file", {
         uri: file.uri,
@@ -47,18 +47,20 @@ export const extractFromFile = async (file: any, disease: string) => {
       `${API_URL}/disease/file/upload?disease=${disease}`,
       formData,
       {
-        timeout: 20000, // 20 sec timeout for heavy PDFs
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+        timeout: 20000,
       }
     );
 
     return res.data;
-
   } catch (error: any) {
-    console.error("Extract From File Error:", error?.response?.data || error.message);
+    console.error("Extract From File Error:", error?.response?.data);
 
     throw new Error(
       error?.response?.data?.message ||
-      "Failed to extract medical data from file"
+        "Failed to extract medical data from file"
     );
   }
 };
