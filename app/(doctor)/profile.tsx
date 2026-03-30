@@ -4,7 +4,6 @@ import { useRouter } from "expo-router";
 
 import { getUser, logout } from "@/utils/auth";
 import { Image } from "react-native";
-import { getAllPatients } from "@/utils/patients";
 import { getDoctorAppointments } from "@/utils/appointments";
 import API_URL from "@/utils/api";
 

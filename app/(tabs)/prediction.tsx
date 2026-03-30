@@ -262,6 +262,67 @@ export default function PredictDisease() {
         }
     }
 
+    if (selectedDisease === "normal") {
+      return (
+        <ScrollView
+          style={{ flex: 1 }}
+          nestedScrollEnabled={true} // ✅ IMPORTANT
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Background blobs */}
+          <View style={styles.bgBlob1} />
+          <View style={styles.bgBlob2} />
+
+          {/* Header */}
+          <View style={styles.header}>
+            <View style={styles.headerRow}>
+              <View style={styles.logoWrap}>
+                <Image source={icons.logo} style={styles.logo} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.title}>AI Disease Prediction</Text>
+                <Text style={styles.subTitle}>
+                  Upload medical scan/report for instant analysis
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Disease Selector */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Select Prediction Type</Text>
+
+            <View style={styles.diseaseGrid}>
+              {diseaseOptions.map((d) => {
+                const active = selectedDisease === d.key;
+                return (
+                  <TouchableOpacity
+                    key={d.key}
+                    style={[
+                      styles.diseaseCard,
+                      active && styles.diseaseCardActive,
+                    ]}
+                    activeOpacity={0.9}
+                    onPress={() => {
+                      setSelectedDisease(d.key as DiseaseKey);
+                      setResult(null);
+                    }}
+                  >
+                    <Text style={styles.diseaseTitle}>{d.title}</Text>
+                    <Text style={styles.diseaseDesc}>{d.desc}</Text>
+                    {active && <Text style={styles.activeTag}>Selected</Text>}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          <View style={{ height: 900, marginTop: 20, marginBottom: 20, paddingHorizontal: 20 }}>
+            <AIChat />
+          </View>
+        </ScrollView>
+      );
+    }
 
     return (
       <ScrollView
@@ -326,11 +387,7 @@ export default function PredictDisease() {
                   : "Enter Medical Parameters"}
               </Text>
 
-              {selectedDisease === "normal" ? (
-                <View style={styles.chatCard}>
-                  <AIChat />
-                </View>
-              ) : (
+            
                 <View style={styles.formCard}>
                   {renderDiseaseForm()}
 
@@ -345,7 +402,7 @@ export default function PredictDisease() {
                     </Text>
                   </TouchableOpacity>
                 </View>
-              )}
+              
             </View>
 
             {/* Upload */}

@@ -13,6 +13,7 @@ export const getChatLog = async () => {
   });
 
   return res.data;
+  
 };
 
 export const generateAiResponse = async (prompt: string, file?: any) => {
@@ -42,7 +43,11 @@ export const generateAiResponse = async (prompt: string, file?: any) => {
     }
   }
 
-  const res = await axios.post(`${API_URL}/ai/chat`, formData);
+  const res = await axios.post(`${API_URL}/ai/chat`, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    }
+  });
 
   return res.data;
 };

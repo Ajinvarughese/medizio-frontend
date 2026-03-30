@@ -211,6 +211,9 @@ export default function AIChat() {
         <EmptyChat onSuggestion={(text) => setInput(text)} />
       ) : (
         <FlatList
+          nestedScrollEnabled // ✅ REQUIRED
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
           ref={flatListRef}
           data={messages}
           keyExtractor={(item, index) =>
