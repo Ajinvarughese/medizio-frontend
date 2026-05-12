@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
     View,
     Text,
@@ -11,7 +11,7 @@ import {
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { getDoctorAppointments } from "@/utils/appointments";
 import { calculateAge } from "@/utils/dateTime";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 
 const { width } = Dimensions.get("window");
 
@@ -20,9 +20,11 @@ export default function Patients() {
     const [appointments, setAppointments] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
     
-    useEffect(() => {
+    useFocusEffect(
+      useCallback(() => {
         loadPastAppointments();
-    }, []);
+      }, [])
+    );
 
     const loadPastAppointments = async () => {
         const res = await getDoctorAppointments();

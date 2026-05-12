@@ -34,7 +34,9 @@ export default function DoctorAppointments() {
     const [appointments, setAppointments] = useState([]);
 
     const router = useRouter();
-
+    const replaceUrl = (url: string = "") => {
+      return url?.replace("http://localhost:8080/api", API_URL);
+    };
     const loadData = async () => {
         const res = await getDoctorAppointments();
         if(activeTab == "Recents") {
@@ -325,7 +327,7 @@ export default function DoctorAppointments() {
                     {a?.document && (
                         <TouchableOpacity
                             style={styles.pdfBtn}
-                            onPress={() => Linking.openURL(a.document)}
+                            onPress={() => Linking.openURL(replaceUrl(a.document))}
                         >
                             <MaterialCommunityIcons 
                                 name="file-pdf-box" 
